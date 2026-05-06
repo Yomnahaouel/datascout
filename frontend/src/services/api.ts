@@ -70,6 +70,32 @@ function normalizeDatasetList(response: DatasetListResponse): DatasetListRespons
   };
 }
 
+type ApiPreview = DataPreview & {
+  rows?: (string | number | boolean | null)[][] | Record<string, unknown>[];
+};
+
+function normalizePreview(preview: ApiPreview): DataPreview {
+  let data = preview.data;
+  if ((!data || data.length === 0) && Array.isArray(preview.rows)) {
+    data = preview.rows.map((row) => {
+      if (Array.isArray(row)) return row;
+      return preview.columns.map((column) => {
+        const value = row[column];
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null) {
+          return value;
+        }
+        return value === undefined ? null : String(value);
+      });
+    });
+  }
+
+  return {
+    ...preview,
+    data: data ?? [],
+    rows: data ?? [],
+  };
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -224,7 +250,7 @@ export async function getDatasetPreview(
   rows: number = 100,
   offset: number = 0
 ): Promise<DataPreview> {
-  return request<DataPreview>(`/datasets/${id}/preview?rows=${rows}&offset=${offset}`);
+  return normalizePreview(await request<ApiPreview>(`/datasets/${id}/preview?rows=${rows}&offset=${offset}`));
 }
 
 // ----- Tags -----

@@ -23,18 +23,32 @@ export default function DatasetProfilePage() {
     if (!id) return;
     const numId = Number(id);
     queueMicrotask(() => setLoading(true));
-    Promise.all([
-      getDataset(numId),
-      getDatasetProfile(numId),
-      getDatasetPreview(numId),
-    ])
-      .then(([datasetData, profileData, previewData]) => {
+    getDataset(numId)
+      .then(async (datasetData) => {
         setDataset(datasetData);
-        setColumns(profileData); // getDatasetProfile returns ColumnProfile[] directly
-        setPreview(previewData);
+
+        const [profileResult, previewResult] = await Promise.allSettled([
+          getDatasetProfile(numId),
+          getDatasetPreview(numId),
+        ]);
+
+        if (profileResult.status === "fulfilled") {
+          setColumns(profileResult.value);
+        } else {
+          console.error("Failed to load dataset profile:", profileResult.reason);
+          setColumns([]);
+        }
+
+        if (previewResult.status === "fulfilled") {
+          setPreview(previewResult.value);
+        } else {
+          console.error("Failed to load dataset preview:", previewResult.reason);
+          setPreview(null);
+        }
       })
       .catch((err) => {
         console.error("Failed to load dataset:", err);
+        setDataset(null);
       })
       .finally(() => setLoading(false));
   }, [id]);
