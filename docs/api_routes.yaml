@@ -1,0 +1,35 @@
+# Dataset Management
+POST   /api/datasets/upload          # Upload new dataset
+GET    /api/datasets                 # List all datasets (with filters)
+GET    /api/datasets/{id}            # Get dataset details
+DELETE /api/datasets/{id}            # Remove dataset
+GET    /api/datasets/{id}/preview    # Preview first N rows
+GET    /api/datasets/{id}/download   # Download original file
+
+# Semantic Search
+GET    /api/search?q={query}         # Natural language search
+GET    /api/search/suggest?q={query} # Auto-complete suggestions
+
+# Auto-Profile
+GET    /api/datasets/{id}/profile           # Get full profile
+GET    /api/datasets/{id}/profile/columns   # Get column-level details
+POST   /api/datasets/{id}/profile/rerun     # Re-run profiling
+
+# Auto-Tags
+GET    /api/datasets/{id}/tags       # Get all tags
+POST   /api/datasets/{id}/tags       # Add manual tag
+PUT    /api/datasets/{id}/tags/{tid} # Edit tag
+DELETE /api/datasets/{id}/tags/{tid} # Remove tag
+
+# Quality Score
+GET    /api/datasets/{id}/quality    # Get quality breakdown
+
+# Auto-Dashboard
+GET    /api/datasets/{id}/dashboard  # Get dashboard config + data
+
+# Platform Stats
+GET    /api/stats/overview           # Total datasets, avg quality, etc.
+
+# Model Comparison (for academic evaluation)
+GET    /api/ai/benchmarks            # All model comparison results
+GET    /api/ai/benchmarks/{engine}   # Per-engine comparison

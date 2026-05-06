@@ -1,0 +1,845 @@
+# DataScout — Complete UI Schema & Design Specification
+
+## PURPOSE OF THIS DOCUMENT
+This document defines the complete user interface for DataScout. It includes all pages, components, layouts, user flows, and visual specifications. Use this as the blueprint for building the React frontend.
+
+---
+
+## NAVIGATION STRUCTURE
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVBAR (always visible)                                     │
+│  ┌────────┐                          ┌──────┐ ┌──────────┐  │
+│  │ 🔍 Logo │                          │Upload│ │ Settings │  │
+│  │DataScout│                          │  +   │ │    ⚙️    │  │
+│  └────────┘                          └──────┘ └──────────┘  │
+│                                                             │
+│  Navigation Tabs: [Search] [Browse] [Dashboard]             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Routes:**
+- `/` → SearchPage (home)
+- `/browse` → BrowsePage
+- `/datasets/:id` → DatasetProfilePage
+- `/datasets/:id/dashboard` → DashboardPage
+- `/upload` → UploadPage (modal or page)
+
+---
+
+## PAGE 1: SEARCH PAGE (Home)
+
+**Route:** `/`
+
+**Purpose:** Main landing page. Users search for datasets using natural language.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVBAR                                                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                      🔍 DataScout                           │
+│               Your intelligent scout for data               │
+│                                                             │
+│         ┌───────────────────────────────────────┐           │
+│         │  🔍 Search datasets...                │           │
+│         └───────────────────────────────────────┘           │
+│                                                             │
+│         Popular: [Finance] [Fraud] [Clients] [Risk]         │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📊 Platform Stats                                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │   127    │ │   3.2M   │ │    74    │ │    12    │       │
+│  │ datasets │ │   rows   │ │ avg qual │ │ domains  │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🕐 Recently Added                                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 📄 credit_card_fraud.csv              ⭐ 89/100     │   │
+│  │ [Finance] [Fraud] [Confidential]                    │   │
+│  │ 284K rows • 31 cols • CSV • 2 days ago              │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 📄 customer_churn.csv                 ⭐ 73/100     │   │
+│  │ [Marketing] [Clients]                               │   │
+│  │ 10K rows • 14 cols • CSV • 1 week ago               │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+- `SearchBar` — large, centered, with search icon
+- `TagCloud` — clickable popular tags
+- `StatsCards` — 4 KPI cards in a row
+- `DatasetCard` — compact card for recent datasets
+
+**Behavior:**
+- On search submit → navigate to `/browse?q={query}` or show results inline
+- Clicking a tag → search for that tag
+- Clicking a dataset card → navigate to `/datasets/:id`
+
+---
+
+## PAGE 2: BROWSE PAGE
+
+**Route:** `/browse` or `/browse?q={query}`
+
+**Purpose:** Browse all datasets with filters and sorting. Shows search results if query param exists.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVBAR                                                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  🔍 Search datasets...                     [Search] │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Showing 45 datasets                    Sort: [Relevance ▼] │
+│                                                             │
+├──────────────────┬──────────────────────────────────────────┤
+│                  │                                          │
+│  FILTERS         │  RESULTS                                 │
+│                  │                                          │
+│  Domain          │  ┌────────────────────────────────────┐  │
+│  ☑ Finance       │  │ 📄 credit_card_fraud.csv  ⭐89    │  │
+│  ☑ Risk          │  │ [Finance] [Fraud]                  │  │
+│  ☐ Marketing     │  │ Credit card transactions with...   │  │
+│  ☐ HR            │  │ 284K rows • 31 cols • CSV          │  │
+│  ☐ Operations    │  │ Completeness: 98% | PII: No        │  │
+│  ☐ Compliance    │  │ [View Profile] [View Dashboard]    │  │
+│                  │  └────────────────────────────────────┘  │
+│  Quality Score   │                                          │
+│  ├───●─────────┤ │  ┌────────────────────────────────────┐  │
+│  0      50   100 │  │ 📄 loan_applications.csv   ⭐72    │  │
+│  Min: 50         │  │ [Finance] [Credit] [⚠️ PII]        │  │
+│                  │  │ Loan application records with...   │  │
+│  Format          │  │ 50K rows • 22 cols • CSV           │  │
+│  ☑ CSV           │  │ Completeness: 85% | PII: Yes       │  │
+│  ☑ Excel         │  │ [View Profile] [View Dashboard]    │  │
+│  ☐ JSON          │  └────────────────────────────────────┘  │
+│                  │                                          │
+│  PII             │  ┌────────────────────────────────────┐  │
+│  ○ All           │  │ 📄 hr_employees.csv        ⭐81    │  │
+│  ○ Contains PII  │  │ [HR] [Operations] [⚠️ PII]         │  │
+│  ○ No PII        │  │ Employee records including...      │  │
+│                  │  │ 5K rows • 18 cols • Excel          │  │
+│  [Clear Filters] │  │ Completeness: 92% | PII: Yes       │  │
+│                  │  │ [View Profile] [View Dashboard]    │  │
+│                  │  └────────────────────────────────────┘  │
+│                  │                                          │
+│                  │  ─────────────────────────────────────   │
+│                  │  [1] [2] [3] [4] [5] ... [12]  Next →    │
+│                  │                                          │
+└──────────────────┴──────────────────────────────────────────┘
+```
+
+**Components:**
+- `SearchBar` — top, smaller than home page
+- `FilterSidebar` — left panel with filter options
+- `DatasetCardExpanded` — larger card with more details
+- `Pagination` — bottom of results
+
+**Filters:**
+- Domain: multi-select checkboxes
+- Quality Score: range slider (0-100)
+- Format: multi-select checkboxes (CSV, Excel, JSON)
+- PII: radio buttons (All, Contains PII, No PII)
+- Row Count: range slider
+
+**Sorting Options:**
+- Relevance (if search query)
+- Quality Score (high to low)
+- Name (A-Z)
+- Upload Date (newest first)
+- Row Count (high to low)
+
+**Behavior:**
+- Filters update results in real-time (or on Apply button)
+- Clicking "View Profile" → `/datasets/:id`
+- Clicking "View Dashboard" → `/datasets/:id/dashboard`
+
+---
+
+## PAGE 3: DATASET PROFILE PAGE
+
+**Route:** `/datasets/:id`
+
+**Purpose:** Full details about a single dataset — metadata, profile, tags, quality.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVBAR                                                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ← Back to Browse                                           │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │  📄 credit_card_fraud.csv                          │   │
+│  │  Credit card transaction data with fraud labels    │   │
+│  │                                                     │   │
+│  │  [Finance] [Fraud] [Risk] [Confidential]           │   │
+│  │                                                     │   │
+│  │  Uploaded: Mar 5, 2026 • Format: CSV • Size: 143MB │   │
+│  │                                                     │   │
+│  │  [📈 View Dashboard]  [⬇️ Download]  [🗑️ Delete]   │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📊 Overview                                                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │  284,807 │ │    31    │ │  143 MB  │ │  89/100  │       │
+│  │   rows   │ │ columns  │ │   size   │ │ quality  │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ✅ Quality Breakdown                                       │
+│                                                             │
+│  Completeness   ████████████████████░░░░  85%              │
+│  Consistency    ██████████████████████░░  90%              │
+│  Uniqueness     ████████████░░░░░░░░░░░░  60%              │
+│  Validity       ██████████████░░░░░░░░░░  70%              │
+│  Timeliness     ███████████░░░░░░░░░░░░░  55%              │
+│                                                             │
+│  Overall Score: 89/100 ⭐                                   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📋 Column Profile                        [Show All Cols ▼] │
+│                                                             │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Column      │ Type      │ Missing │ Unique │ Outliers │ │
+│  ├─────────────┼───────────┼─────────┼────────┼──────────┤ │
+│  │ amount      │ monetary  │ 0.0%    │ 32,767 │ 1,247    │ │
+│  │ time        │ numeric   │ 0.0%    │ 284,807│ 0        │ │
+│  │ V1          │ numeric   │ 0.0%    │ 275,663│ 456      │ │
+│  │ V2          │ numeric   │ 0.0%    │ 275,663│ 892      │ │
+│  │ ...         │ ...       │ ...     │ ...    │ ...      │ │
+│  │ class       │ binary    │ 0.0%    │ 2      │ —        │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                             │
+│  [📋 View Full Profile Table]                               │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🔍 Data Preview (first 50 rows)           [Show Preview ▼] │
+│                                                             │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ amount  │ time  │ V1      │ V2      │ ... │ class     │ │
+│  ├─────────┼───────┼─────────┼─────────┼─────┼───────────┤ │
+│  │ 149.62  │ 0     │ -1.3598 │ -0.0728 │ ... │ 0         │ │
+│  │ 2.69    │ 0     │ 1.1918  │ 0.2662  │ ... │ 0         │ │
+│  │ 378.66  │ 1     │ -1.3583 │ -1.3402 │ ... │ 0         │ │
+│  │ ...     │ ...   │ ...     │ ...     │ ... │ ...       │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+- `DatasetHeader` — name, description, tags, actions
+- `KPICards` — row count, column count, size, quality
+- `QualityBreakdown` — 5 progress bars with percentages
+- `ColumnProfileTable` — sortable, scrollable table
+- `DataPreviewTable` — first 50 rows, horizontally scrollable
+
+**Behavior:**
+- "View Dashboard" → navigate to `/datasets/:id/dashboard`
+- "Download" → trigger file download
+- "Delete" → confirmation modal, then delete and redirect to browse
+- Column table is sortable by any column
+- Clicking a column name → shows detailed column stats modal
+
+---
+
+## PAGE 4: DASHBOARD PAGE
+
+**Route:** `/datasets/:id/dashboard`
+
+**Purpose:** Auto-generated exploratory dashboard with charts.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVBAR                                                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ← Back to Profile                                          │
+│                                                             │
+│  📈 Dashboard: credit_card_fraud.csv                        │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │  284,807 │ │    31    │ │  143 MB  │ │  89/100  │       │
+│  │   rows   │ │ columns  │ │   size   │ │ quality  │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌───────────────────────┐  ┌───────────────────────┐      │
+│  │ Amount Distribution   │  │ Class Balance         │      │
+│  │                       │  │                       │      │
+│  │    ▃▅█▇▃▂▁▁▁         │  │   ██████████ 99.8%   │      │
+│  │                       │  │   ░          0.2%    │      │
+│  │    (histogram)        │  │   (pie chart)        │      │
+│  │                       │  │                       │      │
+│  └───────────────────────┘  └───────────────────────┘      │
+│                                                             │
+│  ┌───────────────────────┐  ┌───────────────────────┐      │
+│  │ Amount Box Plot       │  │ Time Distribution     │      │
+│  │                       │  │                       │      │
+│  │  ├──┬────────┬──┤    │  │                       │      │
+│  │     │        │        │  │    ╭──╮  ╭──╮        │      │
+│  │  (box plot)           │  │   ╭╯  ╰──╯  ╰─       │      │
+│  │                       │  │   (time series)      │      │
+│  └───────────────────────┘  └───────────────────────┘      │
+│                                                             │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │ Correlation Heatmap                              │      │
+│  │                                                  │      │
+│  │     V1   V2   V3   V4   V5                      │      │
+│  │ V1  █    ▓    ░    ░    ▒                       │      │
+│  │ V2  ▓    █    ▒    ░    ░                       │      │
+│  │ V3  ░    ▒    █    ▓    ░                       │      │
+│  │ V4  ░    ░    ▓    █    ▒                       │      │
+│  │ V5  ▒    ░    ░    ▒    █                       │      │
+│  │                                                  │      │
+│  └──────────────────────────────────────────────────┘      │
+│                                                             │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │ Missing Values Map                               │      │
+│  │                                                  │      │
+│  │ amount  ████████████████████████████████ 0.0%   │      │
+│  │ time    ████████████████████████████████ 0.0%   │      │
+│  │ V1      ████████████████████████████████ 0.0%   │      │
+│  │ V2      ████████████████████████████████ 0.0%   │      │
+│  │ class   ████████████████████████████████ 0.0%   │      │
+│  │                                                  │      │
+│  └──────────────────────────────────────────────────┘      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Components (rendered dynamically from JSON config):**
+- `KPICards` — always at top
+- `HistogramChart` — for numeric columns
+- `BoxPlotChart` — for numeric columns
+- `BarChartComponent` — for categorical columns
+- `PieChartComponent` — for low-cardinality categorical
+- `ClassBalanceChart` — for binary columns
+- `TimeSeriesChart` — for date columns
+- `HeatmapChart` — correlation matrix
+- `MissingValuesMap` — horizontal bar chart of missing %
+
+**Layout:**
+- 2-column grid on desktop
+- 1-column on mobile
+- Charts are responsive and resize
+- Full-width charts span both columns (heatmap, missing values)
+
+**Behavior:**
+- Page fetches `/api/datasets/:id/dashboard` on load
+- Reads JSON config and maps each chart type to the correct component
+- Loading spinner while fetching
+- Error state if dashboard generation failed
+
+---
+
+## PAGE 5: UPLOAD PAGE (Modal)
+
+**Trigger:** Click "Upload +" button in navbar
+
+**Purpose:** Upload a new dataset file.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │                        ✕ Close                        │ │
+│  │                                                       │ │
+│  │                    📁 Upload Dataset                  │ │
+│  │                                                       │ │
+│  │   ┌───────────────────────────────────────────────┐   │ │
+│  │   │                                               │   │ │
+│  │   │         Drag and drop your file here         │   │ │
+│  │   │                     or                        │   │ │
+│  │   │              [Browse Files]                   │   │ │
+│  │   │                                               │   │ │
+│  │   │         Supported: CSV, Excel, JSON          │   │ │
+│  │   │             Max size: 500 MB                  │   │ │
+│  │   │                                               │   │ │
+│  │   └───────────────────────────────────────────────┘   │ │
+│  │                                                       │ │
+│  │   Dataset Name (optional):                            │ │
+│  │   ┌───────────────────────────────────────────────┐   │ │
+│  │   │                                               │   │ │
+│  │   └───────────────────────────────────────────────┘   │ │
+│  │                                                       │ │
+│  │   Description (optional):                             │ │
+│  │   ┌───────────────────────────────────────────────┐   │ │
+│  │   │                                               │   │ │
+│  │   │                                               │   │ │
+│  │   └───────────────────────────────────────────────┘   │ │
+│  │                                                       │ │
+│  │                              [Cancel]  [Upload]       │ │
+│  │                                                       │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**After Upload — Processing State:**
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                                                           │
+│                   ⏳ Processing Dataset                   │
+│                                                           │
+│                   credit_card_fraud.csv                   │
+│                                                           │
+│   ✅ Uploaded                                             │
+│   ✅ Validating                                           │
+│   ✅ Profiling columns                                    │
+│   ⏳ Detecting PII...                                     │
+│   ○ Calculating quality score                             │
+│   ○ Indexing for search                                   │
+│   ○ Generating dashboard                                  │
+│                                                           │
+│   ████████████░░░░░░░░░░░░░░░░░░░  40%                   │
+│                                                           │
+└───────────────────────────────────────────────────────────┘
+```
+
+**After Processing — Success State:**
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                                                           │
+│                   ✅ Dataset Ready!                       │
+│                                                           │
+│                   credit_card_fraud.csv                   │
+│                                                           │
+│   Quality Score: 89/100 ⭐                                │
+│   Domain: Finance, Fraud                                  │
+│   PII Detected: No                                        │
+│   Rows: 284,807 | Columns: 31                            │
+│                                                           │
+│            [View Profile]  [View Dashboard]               │
+│                                                           │
+└───────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+- `UploadModal` — modal wrapper
+- `DropZone` — drag-and-drop area
+- `ProgressSteps` — shows pipeline progress
+- `SuccessSummary` — shows results after processing
+
+**Behavior:**
+- Drag and drop or click to select file
+- On upload, POST to `/api/datasets/upload`
+- Poll or websocket to get processing status
+- Show progress steps as each engine completes
+- On success, show summary with links to profile and dashboard
+
+---
+
+## COMMON COMPONENTS
+
+### Navbar
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🔍 DataScout          [Search] [Browse]      [Upload+] [⚙️] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Logo (clickable → home)
+- Navigation tabs
+- Upload button (opens modal)
+- Settings icon (future: user preferences)
+
+### DatasetCard (Compact)
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 📄 credit_card_fraud.csv              ⭐ 89/100    │
+│ [Finance] [Fraud] [Confidential]                   │
+│ 284K rows • 31 cols • CSV • 2 days ago             │
+└─────────────────────────────────────────────────────┘
+```
+
+### DatasetCardExpanded
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 📄 credit_card_fraud.csv                        ⭐ 89/100  │
+│ [Finance] [Fraud]                                          │
+│ Credit card transaction data with fraud labels for...      │
+│ 284K rows • 31 cols • CSV                                  │
+│ Completeness: 98% | PII: No                                │
+│ [View Profile] [View Dashboard]                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+### QualityBadge
+
+```
+Based on score:
+- 80-100: ⭐ Green badge
+- 60-79:  ⚠️ Yellow badge  
+- 0-59:   🔴 Red badge
+```
+
+### TagBadge
+
+```
+Domain tags:    Blue background
+Sensitivity:    Red/Orange background
+PII warning:    Red with ⚠️ icon
+Format:         Gray background
+```
+
+### KPICard
+
+```
+┌──────────┐
+│  284,807 │  ← Large number
+│   rows   │  ← Small label
+└──────────┘
+```
+
+### QualityProgressBar
+
+```
+Completeness   ████████████████░░░░  80%
+               ↑ colored bar        ↑ percentage
+```
+
+---
+
+## COLOR SCHEME
+
+```
+Primary:        #3B82F6 (Blue)
+Secondary:      #10B981 (Green)
+Warning:        #F59E0B (Yellow)
+Danger:         #EF4444 (Red)
+Background:     #F9FAFB (Light gray)
+Card Background:#FFFFFF (White)
+Text Primary:   #111827 (Dark gray)
+Text Secondary: #6B7280 (Medium gray)
+Border:         #E5E7EB (Light border)
+```
+
+---
+
+## TYPOGRAPHY
+
+```
+Font Family:    Inter (or system font stack)
+Headings:       font-bold
+  H1:           text-3xl (30px)
+  H2:           text-2xl (24px)
+  H3:           text-xl (20px)
+Body:           text-base (16px)
+Small:          text-sm (14px)
+Tiny:           text-xs (12px)
+```
+
+---
+
+## SPACING SYSTEM (Tailwind)
+
+```
+Padding/Margin scale:
+  p-1 / m-1:    4px
+  p-2 / m-2:    8px
+  p-4 / m-4:    16px
+  p-6 / m-6:    24px
+  p-8 / m-8:    32px
+
+Card padding:   p-4 or p-6
+Section gap:    space-y-6 or gap-6
+Grid gap:       gap-4 or gap-6
+```
+
+---
+
+## RESPONSIVE BREAKPOINTS
+
+```
+Mobile:         < 640px    (1 column layout)
+Tablet:         640-1024px (2 column layout)
+Desktop:        > 1024px   (sidebar + main, 2-3 column grids)
+```
+
+---
+
+## LOADING STATES
+
+```
+Page loading:       Full page spinner centered
+Card loading:       Skeleton placeholder (gray animated boxes)
+Button loading:     Spinner inside button, button disabled
+Table loading:      Skeleton rows
+```
+
+---
+
+## ERROR STATES
+
+```
+API error:          Toast notification (top right, red)
+Empty results:      Illustration + "No datasets found" message
+Upload error:       Error message below dropzone
+404 page:           "Dataset not found" with link to browse
+```
+
+---
+
+## USER FLOWS
+
+### Flow 1: Search for a Dataset
+```
+Home → Type query → Submit → See results → Click card → View profile → View dashboard
+```
+
+### Flow 2: Browse and Filter
+```
+Browse → Apply filters → Sort results → Click card → View profile → Download
+```
+
+### Flow 3: Upload New Dataset
+```
+Click Upload → Drag file → Add name/description → Submit → Watch progress → View profile
+```
+
+### Flow 4: Explore Dashboard
+```
+Profile page → Click "View Dashboard" → See auto-generated charts → Analyze data
+```
+
+---
+
+## COMPONENT FILE STRUCTURE
+
+```
+src/
+├── components/
+│   ├── common/
+│   │   ├── Navbar.tsx
+│   │   ├── SearchBar.tsx
+│   │   ├── KPICard.tsx
+│   │   ├── QualityBadge.tsx
+│   │   ├── TagBadge.tsx
+│   │   ├── LoadingSpinner.tsx
+│   │   ├── SkeletonCard.tsx
+│   │   └── ErrorMessage.tsx
+│   │
+│   ├── dataset/
+│   │   ├── DatasetCard.tsx
+│   │   ├── DatasetCardExpanded.tsx
+│   │   ├── DatasetHeader.tsx
+│   │   ├── QualityBreakdown.tsx
+│   │   ├── ColumnProfileTable.tsx
+│   │   └── DataPreviewTable.tsx
+│   │
+│   ├── charts/
+│   │   ├── HistogramChart.tsx
+│   │   ├── BoxPlotChart.tsx
+│   │   ├── BarChartComponent.tsx
+│   │   ├── PieChartComponent.tsx
+│   │   ├── TimeSeriesChart.tsx
+│   │   ├── HeatmapChart.tsx
+│   │   ├── MissingValuesMap.tsx
+│   │   └── ClassBalanceChart.tsx
+│   │
+│   ├── filters/
+│   │   ├── FilterSidebar.tsx
+│   │   ├── DomainFilter.tsx
+│   │   ├── QualitySlider.tsx
+│   │   ├── FormatFilter.tsx
+│   │   └── PIIFilter.tsx
+│   │
+│   └── upload/
+│       ├── UploadModal.tsx
+│       ├── DropZone.tsx
+│       ├── ProgressSteps.tsx
+│       └── SuccessSummary.tsx
+│
+├── pages/
+│   ├── SearchPage.tsx
+│   ├── BrowsePage.tsx
+│   ├── DatasetProfilePage.tsx
+│   └── DashboardPage.tsx
+│
+├── services/
+│   └── api.ts
+│
+├── types/
+│   └── types.ts
+│
+├── App.tsx
+└── index.tsx
+```
+
+---
+
+## API INTEGRATION
+
+```typescript
+// services/api.ts
+
+const API_BASE = 'http://localhost:8000/api';
+
+// Search
+export const searchDatasets = (query: string) => 
+  fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`).then(r => r.json());
+
+// Datasets
+export const getDatasets = (filters?: FilterParams) => 
+  fetch(`${API_BASE}/datasets?${new URLSearchParams(filters)}`).then(r => r.json());
+
+export const getDataset = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}`).then(r => r.json());
+
+export const uploadDataset = (file: File, name?: string, description?: string) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (name) formData.append('name', name);
+  if (description) formData.append('description', description);
+  return fetch(`${API_BASE}/datasets/upload`, { method: 'POST', body: formData }).then(r => r.json());
+};
+
+export const deleteDataset = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}`, { method: 'DELETE' }).then(r => r.json());
+
+// Profile, Tags, Quality
+export const getProfile = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}/profile`).then(r => r.json());
+
+export const getTags = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}/tags`).then(r => r.json());
+
+export const getQuality = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}/quality`).then(r => r.json());
+
+// Dashboard
+export const getDashboard = (id: string) => 
+  fetch(`${API_BASE}/datasets/${id}/dashboard`).then(r => r.json());
+
+// Preview
+export const getPreview = (id: string, rows: number = 50) => 
+  fetch(`${API_BASE}/datasets/${id}/preview?rows=${rows}`).then(r => r.json());
+```
+
+---
+
+## TYPESCRIPT INTERFACES
+
+```typescript
+// types/types.ts
+
+interface Dataset {
+  id: string;
+  name: string;
+  description: string | null;
+  file_path: string;
+  file_format: 'csv' | 'xlsx' | 'json';
+  file_size_bytes: number;
+  row_count: number;
+  column_count: number;
+  uploaded_at: string;
+  quality_score: number;
+  status: 'processing' | 'ready' | 'error';
+}
+
+interface ColumnProfile {
+  id: string;
+  dataset_id: string;
+  column_name: string;
+  column_index: number;
+  raw_dtype: string;
+  inferred_type: string;
+  missing_count: number;
+  missing_pct: number;
+  unique_count: number;
+  mean: number | null;
+  median: number | null;
+  std_dev: number | null;
+  min_value: string | null;
+  max_value: string | null;
+  distribution: string | null;
+  outlier_count: number;
+  sample_values: string[];
+  is_pii: boolean;
+  pii_type: string | null;
+}
+
+interface Tag {
+  id: string;
+  dataset_id: string;
+  tag_category: 'domain' | 'sensitivity' | 'pii' | 'format';
+  tag_value: string;
+  confidence: number;
+  method: string;
+}
+
+interface QualityScore {
+  id: string;
+  dataset_id: string;
+  completeness: number;
+  consistency: number;
+  uniqueness: number;
+  validity: number;
+  timeliness: number;
+  overall_score: number;
+  scored_at: string;
+}
+
+interface DashboardConfig {
+  id: string;
+  dataset_id: string;
+  charts: ChartConfig[];
+  generated_at: string;
+}
+
+interface ChartConfig {
+  type: 'kpi_cards' | 'histogram' | 'box_plot' | 'bar_chart' | 'pie_chart' | 'time_series' | 'heatmap' | 'missing_values' | 'class_balance';
+  column?: string;
+  data: any;
+}
+
+interface SearchResult {
+  dataset: Dataset;
+  score: number;
+  tags: Tag[];
+}
+
+interface FilterParams {
+  q?: string;
+  domain?: string[];
+  min_quality?: number;
+  max_quality?: number;
+  format?: string[];
+  has_pii?: boolean;
+  sort?: 'relevance' | 'quality' | 'name' | 'date' | 'rows';
+  page?: number;
+  limit?: number;
+}
+```
+
+---
+
+This is the **complete UI specification** for DataScout. Any AI can read this and build the entire frontend. 🚀

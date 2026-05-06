@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.py[cod]
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/uploads/
+backend/chroma_db/
+
+# Local environments/cache
+.venv/
+node_modules/
+*.log

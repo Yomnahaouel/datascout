@@ -1,0 +1,156 @@
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PostgreSQL 15 Database
+  # ─────────────────────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: datascout-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-datascout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datascout}
+      POSTGRES_DB: ${POSTGRES_DB:-datascout}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datascout} -d ${POSTGRES_DB:-datascout}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ChromaDB Vector Database
+  # ─────────────────────────────────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:0.4.24
+    container_name: datascout-chromadb
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "false"
+      PERSIST_DIRECTORY: /chroma/chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FastAPI Backend with NVIDIA GPU Support
+  # ─────────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.cpu
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: datascout-backend
+    restart: unless-stopped
+    # GPU support disabled (no NVIDIA GPU in this environment)
+    # runtime: nvidia
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-datascout}:${POSTGRES_PASSWORD:-datascout}@db:5432/${POSTGRES_DB:-datascout}
+      # ChromaDB
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+      # HuggingFace
+      HF_HOME: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface/transformers
+      SENTENCE_TRANSFORMERS_HOME: /cache/huggingface/sentence_transformers
+      # CUDA (disabled - no GPU)
+      # NVIDIA_VISIBLE_DEVICES: all
+      # CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-0}
+      # App
+      DEBUG: ${DEBUG:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - pip_cache:/root/.cache/pip
+      - model_cache:/cache/huggingface
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # React Frontend with Nginx
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: datascout-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - npm_cache:/root/.npm
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Networks
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  datascout-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  chroma_data:
+    driver: local
+  pip_cache:
+    driver: local
+  npm_cache:
+    driver: local
+  model_cache:
+    driver: local

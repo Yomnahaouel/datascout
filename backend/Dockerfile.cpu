@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DataScout Backend - CPU-only Dockerfile (lightweight)
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM python:3.11-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt && \
+    python -m spacy download en_core_web_sm
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Production stage
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS production
+
+LABEL maintainer="DataScout Team"
+LABEL version="1.0.0"
+LABEL description="DataScout FastAPI backend (CPU)"
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd -r datascout && useradd -r -g datascout datascout
+
+# Create directories
+RUN mkdir -p /app/data/datasets /cache/huggingface && \
+    chown -R datascout:datascout /app /cache
+
+# Copy application code
+COPY --chown=datascout:datascout . .
+
+# Environment variables for HuggingFace cache
+ENV HF_HOME=/cache/huggingface
+ENV TRANSFORMERS_CACHE=/cache/huggingface/transformers
+ENV SENTENCE_TRANSFORMERS_HOME=/cache/huggingface/sentence_transformers
+
+USER datascout
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
