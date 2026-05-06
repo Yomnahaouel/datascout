@@ -310,11 +310,11 @@ async def list_datasets(
     )
 
 
-@router.get("/{dataset_id}", response_model=DatasetDetail)
+@router.get("/{dataset_id}")
 async def get_dataset(
     dataset_id: int,
     db: Annotated[AsyncSession, Depends(get_async_db)],
-) -> DatasetDetail:
+) -> dict[str, Any]:
     """
     Get detailed information about a specific dataset.
 
@@ -335,7 +335,103 @@ async def get_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    return DatasetDetail.model_validate(dataset)
+    # Build the detail response manually instead of relying on nested Pydantic
+    # validation. The stored dashboard JSON contains frontend-only fields such
+    # as chart data and KPI labels, which are valid for the app but stricter
+    # response models can reject them and cause a 500 on /datasets/{id}.
+    quality_scores = [
+        {
+            "id": q.id,
+            "dataset_id": q.dataset_id,
+            "completeness": q.completeness,
+            "consistency": q.consistency,
+            "uniqueness": q.uniqueness,
+            "validity": q.validity,
+            "timeliness": q.timeliness,
+            "overall_score": q.overall_score,
+            "grade": q.grade,
+            "details": q.details,
+            "recommendations": q.recommendations,
+            "scored_at": q.scored_at.isoformat() if q.scored_at else None,
+        }
+        for q in dataset.quality_scores
+    ]
+
+    dashboards = [
+        {
+            "id": d.id,
+            "dataset_id": d.dataset_id,
+            "charts": d.charts or [],
+            "kpis": d.kpis or [],
+            "filters": d.filters or [],
+            "layout": d.layout or {},
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "generated_at": d.generated_at.isoformat() if d.generated_at else None,
+        }
+        for d in dataset.dashboard_configs
+    ]
+
+    return {
+        "id": dataset.id,
+        "name": dataset.name,
+        "description": dataset.description,
+        "file_path": dataset.file_path,
+        "file_format": dataset.file_format.value,
+        "file_size_bytes": dataset.file_size_bytes,
+        "file_size": dataset.file_size_bytes,
+        "row_count": dataset.row_count,
+        "column_count": dataset.column_count,
+        "uploaded_at": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "created_at": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "processed_at": dataset.processed_at.isoformat() if dataset.processed_at else None,
+        "quality_score": dataset.quality_score,
+        "status": dataset.status.value,
+        "error_message": dataset.error_message,
+        "tags": [
+            {
+                "id": t.id,
+                "dataset_id": t.dataset_id,
+                "tag_category": t.tag_category.value,
+                "tag_value": t.tag_value,
+                "category": t.tag_category.value,
+                "value": t.tag_value,
+                "confidence": t.confidence,
+                "method": t.method.value,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            }
+            for t in dataset.tags
+        ],
+        "column_profiles": [
+            {
+                "id": p.id,
+                "dataset_id": p.dataset_id,
+                "column_name": p.column_name,
+                "column_index": p.column_index,
+                "raw_dtype": p.raw_dtype,
+                "inferred_type": p.inferred_type,
+                "missing_count": p.missing_count,
+                "missing_pct": p.missing_pct,
+                "unique_count": p.unique_count,
+                "mean": p.mean,
+                "median": p.median,
+                "std_dev": p.std_dev,
+                "min_value": p.min_value,
+                "max_value": p.max_value,
+                "distribution": p.distribution,
+                "outlier_count": p.outlier_count,
+                "sample_values": p.sample_values,
+                "is_pii": p.is_pii,
+                "pii_detected": p.is_pii,
+                "pii_type": p.pii_type,
+            }
+            for p in dataset.column_profiles
+        ],
+        "quality_scores": quality_scores,
+        "quality_score_detail": quality_scores[0] if quality_scores else None,
+        "quality_details": quality_scores[0] if quality_scores else None,
+        "dashboard_configs": dashboards,
+        "dashboard_config": dashboards[0] if dashboards else None,
+    }
 
 
 @router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
