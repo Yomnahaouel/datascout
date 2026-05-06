@@ -365,7 +365,7 @@ async def get_dataset(
             "kpis": d.kpis or [],
             "filters": d.filters or [],
             "layout": d.layout or {},
-            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "created_at": d.generated_at.isoformat() if d.generated_at else None,
             "generated_at": d.generated_at.isoformat() if d.generated_at else None,
         }
         for d in dataset.dashboard_configs
