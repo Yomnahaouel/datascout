@@ -241,7 +241,8 @@ class SearchResponse(BaseModel):
 class DataPreviewResponse(BaseModel):
     dataset_id: int
     columns: list[str]
-    rows: list[dict[str, Any]]
+    data: list[list[Any]]
+    rows: list[list[Any]] | None = None
     total_rows: int
     preview_rows: int
 

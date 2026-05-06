@@ -23,6 +23,53 @@ class ApiError extends Error {
   }
 }
 
+type ApiDataset = Partial<DatasetDetail> & {
+  file_size_bytes?: number;
+  uploaded_at?: string;
+  quality_scores?: QualityScoreDetail[];
+  dashboard_configs?: DashboardConfig[];
+};
+
+function percentScore(score: number | null | undefined): number | null {
+  if (score === null || score === undefined) return null;
+  return score <= 1 ? Math.round(score * 1000) / 10 : score;
+}
+
+function normalizeQuality(q: QualityScoreDetail | null | undefined): QualityScoreDetail | null {
+  if (!q) return null;
+  return {
+    ...q,
+    completeness: percentScore(q.completeness) ?? 0,
+    consistency: percentScore(q.consistency) ?? 0,
+    uniqueness: percentScore(q.uniqueness) ?? 0,
+    validity: percentScore(q.validity) ?? 0,
+    timeliness: percentScore(q.timeliness) ?? 0,
+    overall_score: percentScore(q.overall_score) ?? 0,
+  };
+}
+
+function normalizeDataset<T extends ApiDataset>(dataset: T): T & DatasetDetail {
+  const quality = normalizeQuality(dataset.quality_score_detail ?? dataset.quality_scores?.[0]);
+  return {
+    ...dataset,
+    file_size: dataset.file_size ?? dataset.file_size_bytes ?? 0,
+    created_at: dataset.created_at ?? dataset.uploaded_at ?? new Date().toISOString(),
+    quality_score: percentScore(dataset.quality_score),
+    quality_score_detail: quality,
+    quality_details: quality,
+    dashboard_config: dataset.dashboard_config ?? dataset.dashboard_configs?.[0] ?? null,
+  } as T & DatasetDetail;
+}
+
+function normalizeDatasetList(response: DatasetListResponse): DatasetListResponse {
+  return {
+    ...response,
+    items: response.items.map((dataset) => normalizeDataset(dataset)),
+    skip: response.skip ?? ((response.page ?? 1) - 1) * (response.page_size ?? response.limit ?? response.items.length),
+    limit: response.limit ?? response.page_size ?? response.items.length,
+  };
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -74,11 +121,13 @@ export async function listDatasets(
   if (params.sort_desc !== undefined) searchParams.set("sort_desc", String(params.sort_desc));
 
   const query = searchParams.toString();
-  return request<DatasetListResponse>(`/datasets${query ? `?${query}` : ""}`);
+  const response = await request<DatasetListResponse>(`/datasets${query ? `?${query}` : ""}`);
+  return normalizeDatasetList(response);
 }
 
 export async function getDataset(id: number): Promise<DatasetDetail> {
-  return request<DatasetDetail>(`/datasets/${id}`);
+  const dataset = await request<DatasetDetail>(`/datasets/${id}`);
+  return normalizeDataset(dataset);
 }
 
 export async function deleteDataset(id: number): Promise<void> {
@@ -86,7 +135,8 @@ export async function deleteDataset(id: number): Promise<void> {
 }
 
 export async function reprocessDataset(id: number): Promise<Dataset> {
-  return request<Dataset>(`/datasets/${id}/reprocess`, { method: "POST" });
+  const dataset = await request<Dataset>(`/datasets/${id}/reprocess`, { method: "POST" });
+  return normalizeDataset(dataset);
 }
 
 // ----- Upload -----
@@ -142,7 +192,7 @@ export async function uploadDataset(
     }
 
     onProgress?.({ stage: "Complete", progress: 100 });
-    return response.json();
+    return normalizeDataset(await response.json());
   } catch (err) {
     clearInterval(progressInterval);
     throw err;
@@ -158,7 +208,7 @@ export async function getDatasetProfile(id: number): Promise<ColumnProfile[]> {
 // ----- Quality -----
 
 export async function getDatasetQuality(id: number): Promise<QualityScoreDetail | null> {
-  return request<QualityScoreDetail | null>(`/datasets/${id}/quality`);
+  return normalizeQuality(await request<QualityScoreDetail | null>(`/datasets/${id}/quality`));
 }
 
 // ----- Dashboard -----

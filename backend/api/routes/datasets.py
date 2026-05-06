@@ -186,6 +186,70 @@ async def run_pipeline_background(dataset_id: int) -> None:
 
 
 # -----------------------------------------------------------------------------
+# Search endpoint
+# -----------------------------------------------------------------------------
+
+
+@router.get("/search", response_model=list[DatasetSearchResult])
+async def search_datasets(
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    q: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum results"),
+) -> list[DatasetSearchResult]:
+    """
+    Semantic search across all datasets (spec: sentence-transformers + ChromaDB).
+    """
+    from engines import SearchEngine
+
+    try:
+        chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
+        chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
+        chromadb_token = os.getenv("CHROMADB_TOKEN")
+
+        search_engine = SearchEngine(
+            collection_name="dataset_embeddings",
+            chromadb_host=chromadb_host,
+            chromadb_port=chromadb_port,
+            chromadb_token=chromadb_token,
+        )
+
+        search_resp = await search_engine.search(q, top_k=limit)
+
+        enriched = []
+        for result in search_resp.results:
+            dataset_id = result.metadata.get("dataset_id")
+            if dataset_id is None and result.id.isdigit():
+                dataset_id = int(result.id)
+            if dataset_id is None:
+                continue
+            try:
+                ds_result = await db.execute(
+                    select(Dataset).where(Dataset.id == int(dataset_id))
+                )
+                dataset = ds_result.scalar_one_or_none()
+                if dataset:
+                    enriched.append(
+                        DatasetSearchResult(
+                            dataset_id=dataset.id,
+                            name=dataset.name,
+                            description=dataset.description,
+                            relevance_score=result.score,
+                            matched_columns=[],
+                            snippet=result.content[:500] if result.content else None,
+                        )
+                    )
+            except (ValueError, TypeError):
+                continue
+
+        return enriched
+
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail="Search service unavailable")
+
+
+
+# -----------------------------------------------------------------------------
 # List / Read endpoints
 # -----------------------------------------------------------------------------
 
@@ -302,69 +366,6 @@ async def delete_dataset(
     # Delete from database (cascades to related tables)
     await db.delete(dataset)
     await db.commit()
-
-
-# -----------------------------------------------------------------------------
-# Search endpoint
-# -----------------------------------------------------------------------------
-
-
-@router.get("/search", response_model=list[DatasetSearchResult])
-async def search_datasets(
-    db: Annotated[AsyncSession, Depends(get_async_db)],
-    q: str = Query(..., min_length=1, description="Search query"),
-    limit: int = Query(10, ge=1, le=50, description="Maximum results"),
-) -> list[DatasetSearchResult]:
-    """
-    Semantic search across all datasets (spec: sentence-transformers + ChromaDB).
-    """
-    from engines import SearchEngine
-
-    try:
-        chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
-        chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
-        chromadb_token = os.getenv("CHROMADB_TOKEN")
-
-        search_engine = SearchEngine(
-            collection_name="dataset_embeddings",
-            chromadb_host=chromadb_host,
-            chromadb_port=chromadb_port,
-            chromadb_token=chromadb_token,
-        )
-
-        search_resp = await search_engine.search(q, top_k=limit)
-
-        enriched = []
-        for result in search_resp.results:
-            dataset_id = result.metadata.get("dataset_id")
-            if dataset_id is None and result.id.isdigit():
-                dataset_id = int(result.id)
-            if dataset_id is None:
-                continue
-            try:
-                ds_result = await db.execute(
-                    select(Dataset).where(Dataset.id == int(dataset_id))
-                )
-                dataset = ds_result.scalar_one_or_none()
-                if dataset:
-                    enriched.append(
-                        DatasetSearchResult(
-                            dataset_id=dataset.id,
-                            name=dataset.name,
-                            description=dataset.description,
-                            relevance_score=result.score,
-                            matched_columns=[],
-                            snippet=result.content[:500] if result.content else None,
-                        )
-                    )
-            except (ValueError, TypeError):
-                continue
-
-        return enriched
-
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        raise HTTPException(status_code=500, detail="Search service unavailable")
 
 
 # -----------------------------------------------------------------------------
@@ -512,13 +513,9 @@ async def preview_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    if dataset.status != DatasetStatus.COMPLETED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Dataset not ready. Status: {dataset.status.value}",
-        )
-
-    # Load data
+    # Load data. Preview is allowed even while the analysis pipeline is still
+    # processing, because the raw file is already uploaded and users expect to
+    # inspect it immediately.
     try:
         file_path = Path(dataset.file_path)
         if not file_path.exists():
@@ -553,8 +550,10 @@ async def preview_dataset(
         ]
 
         return DataPreviewResponse(
+            dataset_id=dataset.id,
             columns=columns,
             data=data,
+            rows=data,
             total_rows=dataset.row_count or len(df),
             preview_rows=len(data),
         )

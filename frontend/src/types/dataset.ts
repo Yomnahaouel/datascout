@@ -162,8 +162,11 @@ export interface DataPreview {
 export interface DatasetListResponse {
   items: Dataset[];
   total: number;
-  skip: number;
-  limit: number;
+  skip?: number;
+  limit?: number;
+  page?: number;
+  page_size?: number;
+  pages?: number;
 }
 
 // ----- Stats -----
