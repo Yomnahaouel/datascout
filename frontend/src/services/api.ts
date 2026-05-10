@@ -77,6 +77,8 @@ function normalizeDataset<T extends ApiDataset>(dataset: T): T & DatasetDetail {
     quality_score_detail: quality,
     quality_details: quality,
     dashboard_config: dataset.dashboard_config ?? dataset.dashboard_configs?.[0] ?? null,
+    domain: dataset.domain ?? dataset.domains?.[0] ?? null,
+    domains: dataset.domains ?? (dataset.domain ? [dataset.domain] : []),
     tags: normalizeTags(dataset.tags),
   } as T & DatasetDetail;
 }

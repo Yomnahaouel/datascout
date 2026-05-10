@@ -68,6 +68,50 @@ ALLOWED_EXTENSIONS = {
 UPLOAD_DIR = Path(settings.UPLOAD_DIR if hasattr(settings, "UPLOAD_DIR") else "/app/uploads")
 
 
+def serialize_tag(tag: Tag) -> dict[str, Any]:
+    """Return both backend and frontend-friendly tag field names."""
+    return {
+        "id": tag.id,
+        "dataset_id": tag.dataset_id,
+        "tag_category": tag.tag_category.value,
+        "tag_value": tag.tag_value,
+        "category": tag.tag_category.value,
+        "value": tag.tag_value,
+        "confidence": tag.confidence,
+        "method": tag.method.value,
+        "created_at": tag.created_at.isoformat() if tag.created_at else None,
+    }
+
+
+def domain_values(tags: list[Tag]) -> list[str]:
+    """Unique domain tags in display order."""
+    domains: list[str] = []
+    for tag in tags:
+        if tag.tag_category == TagCategory.DOMAIN and tag.tag_value not in domains:
+            domains.append(tag.tag_value)
+    return domains
+
+
+def serialize_dataset_summary(dataset: Dataset) -> dict[str, Any]:
+    """Serialize list-view datasets with explicit domain info."""
+    domains = domain_values(list(dataset.tags or []))
+    return {
+        "id": dataset.id,
+        "name": dataset.name,
+        "description": dataset.description,
+        "file_format": dataset.file_format.value,
+        "file_size_bytes": dataset.file_size_bytes,
+        "row_count": dataset.row_count,
+        "column_count": dataset.column_count,
+        "uploaded_at": dataset.uploaded_at,
+        "quality_score": dataset.quality_score,
+        "status": dataset.status.value,
+        "domain": domains[0] if domains else None,
+        "domains": domains,
+        "tags": [serialize_tag(tag) for tag in dataset.tags or []],
+    }
+
+
 def get_file_format(filename: str) -> FileFormat | None:
     """Determine file format from extension."""
     ext = Path(filename).suffix.lower()
@@ -268,8 +312,9 @@ async def list_datasets(
     """
     List all datasets with optional filtering and pagination.
     """
-    # Build query
-    query = select(Dataset)
+    # Build query. Load tags explicitly so the browse page can display real
+    # domain labels instead of guessing on the frontend.
+    query = select(Dataset).options(selectinload(Dataset.tags))
 
     # Apply filters
     if status_filter:
@@ -302,7 +347,7 @@ async def list_datasets(
     pages = (total + limit - 1) // limit if limit > 0 else 1
 
     return DatasetListResponse(
-        items=[DatasetResponse.model_validate(d) for d in datasets],
+        items=[serialize_dataset_summary(d) for d in datasets],
         total=total,
         page=page,
         page_size=limit,
@@ -371,10 +416,14 @@ async def get_dataset(
         for d in dataset.dashboard_configs
     ]
 
+    domains = domain_values(list(dataset.tags or []))
+
     return {
         "id": dataset.id,
         "name": dataset.name,
         "description": dataset.description,
+        "domain": domains[0] if domains else None,
+        "domains": domains,
         "file_path": dataset.file_path,
         "file_format": dataset.file_format.value,
         "file_size_bytes": dataset.file_size_bytes,
@@ -387,20 +436,7 @@ async def get_dataset(
         "quality_score": dataset.quality_score,
         "status": dataset.status.value,
         "error_message": dataset.error_message,
-        "tags": [
-            {
-                "id": t.id,
-                "dataset_id": t.dataset_id,
-                "tag_category": t.tag_category.value,
-                "tag_value": t.tag_value,
-                "category": t.tag_category.value,
-                "value": t.tag_value,
-                "confidence": t.confidence,
-                "method": t.method.value,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-            }
-            for t in dataset.tags
-        ],
+        "tags": [serialize_tag(t) for t in dataset.tags],
         "column_profiles": [
             {
                 "id": p.id,

@@ -172,6 +172,9 @@ class DatasetSummary(DatasetBase):
     uploaded_at: datetime | None = None
     quality_score: float | None = None
     status: str
+    domain: str | None = None
+    domains: list[str] = []
+    tags: list[TagResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -47,8 +47,12 @@ export default function DatasetCardExpanded({ dataset, tags = [] }: DatasetCardE
     return colors[format] || "bg-gray-100 text-gray-700";
   };
 
-  const displayTags = tags;
-  const hasPII = displayTags.some((t) => t.category === "pii_type");
+  const domainTags = tags.filter((tag) => tag.category === "domain");
+  const displayTags = domainTags.length > 0
+    ? domainTags
+    : (dataset.domains ?? []).map((domain) => ({ value: domain, category: "domain" as const }));
+  const piiTags = tags.filter((tag) => tag.category === "pii_type");
+  const hasPII = piiTags.length > 0;
 
   return (
     <Link
