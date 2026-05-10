@@ -131,9 +131,13 @@ class IngestionPipeline:
             await self._save_quality_score(dataset, quality)
             dataset.quality_score = quality.overall_score
 
-            # Stage 5: Index for search
-            logger.info("Stage 5: Indexing in search engine")
-            await self._index_for_search(dataset, df, tags)
+            # Stage 5: Index for search. Disabled by default in local Docker to
+            # avoid first-upload delays from sentence-transformers downloads.
+            if os.getenv("DATASCOUT_SEMANTIC_SEARCH", "false").lower() in {"1", "true", "yes"}:
+                logger.info("Stage 5: Indexing in search engine")
+                await self._index_for_search(dataset, df, tags)
+            else:
+                logger.info("Stage 5: Semantic indexing skipped (DATASCOUT_SEMANTIC_SEARCH=false)")
 
             # Stage 6: Generate dashboard
             logger.info("Stage 6: Running dashboard engine")

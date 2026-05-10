@@ -8,6 +8,7 @@ Dataset tag sensitivity/contains_pii if any column has PII.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -170,7 +171,15 @@ class TaggerEngine:
         return " ".join(parts)
 
     async def _classify_domain_spec(self, text: str) -> list[DomainTag]:
-        """Zero-shot with DOMAIN_LABELS_SPEC; take top label only."""
+        """Classify domain.
+
+        Local Docker demos should not block on the very large BART model by
+        default. Set DATASCOUT_HEAVY_ML=true to use BART; otherwise use a fast,
+        deterministic keyword classifier that keeps uploads responsive.
+        """
+        if os.getenv("DATASCOUT_HEAVY_ML", "false").lower() not in {"1", "true", "yes"}:
+            return self._classify_domain_keywords(text)
+
         try:
             classifier = _get_zero_shot_classifier()
             # Spec: single-label, top one
@@ -179,10 +188,31 @@ class TaggerEngine:
             scores = result.get("scores", [])
             if labels and scores:
                 return [DomainTag(label=labels[0], confidence=round(float(scores[0]), 3))]
-            return []
+            return self._classify_domain_keywords(text)
         except Exception as e:
             logger.error(f"Domain classification failed: {e}")
-            return []
+            return self._classify_domain_keywords(text)
+
+    def _classify_domain_keywords(self, text: str) -> list[DomainTag]:
+        """Fast deterministic domain classifier for stable local testing."""
+        text_lower = text.lower()
+        keywords = {
+            "Finance": ["credit", "card", "amount", "balance", "transaction", "payment", "loan", "account", "bank"],
+            "Risk": ["fraud", "risk", "default", "score", "loss", "alert", "case", "probability"],
+            "Marketing": ["campaign", "customer", "segment", "lead", "conversion", "channel"],
+            "HR": ["employee", "salary", "department", "hire", "performance", "work_email"],
+            "Operations": ["operation", "process", "ticket", "queue", "sla", "inventory"],
+            "Compliance": ["compliance", "kyc", "aml", "regulation", "audit", "policy", "ssn"],
+            "Products": ["product", "category", "sku", "portfolio", "subscription"],
+        }
+        scores = {
+            label: sum(1 for keyword in words if keyword in text_lower)
+            for label, words in keywords.items()
+        }
+        best_label, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score <= 0:
+            return [DomainTag(label="Finance", confidence=0.55)]
+        return [DomainTag(label=best_label, confidence=round(min(0.95, 0.55 + best_score * 0.1), 3))]
 
     async def _detect_pii_spec(self, data: pd.DataFrame) -> PIIReport:
         """

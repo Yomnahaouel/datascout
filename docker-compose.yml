@@ -83,6 +83,8 @@ services:
       # CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-0}
       # App
       DEBUG: ${DEBUG:-false}
+      DATASCOUT_HEAVY_ML: ${DATASCOUT_HEAVY_ML:-false}
+      DATASCOUT_SEMANTIC_SEARCH: ${DATASCOUT_SEMANTIC_SEARCH:-false}
     ports:
       - "8000:8000"
     depends_on:
