@@ -203,51 +203,6 @@ Expected result:
 - `credit_card_number` detected as credit card
 - `account_balance` has missing values
 
-## Testing Bank Marketing Dataset
-
-Some public CSV files, such as UCI Bank Marketing, use semicolon `;` as separator instead of comma `,`.
-
-If DataScout shows only one column like:
-
-```text
-age;"job";"marital";"education";...
-```
-
-then the file separator is the problem.
-
-Fix it by opening the file in Excel and exporting it again as **CSV UTF-8** with proper comma-separated columns.
-
-Alternative PowerShell quick conversion:
-
-```powershell
-(Get-Content .\bank-additional.csv) -replace ';', ',' | Set-Content .\bank-additional-fixed.csv
-```
-
-Then upload:
-
-```text
-bank-additional-fixed.csv
-```
-
-Expected result:
-
-- Around 20 columns
-- Domain: Marketing or Finance
-- PII Fields: usually 0 because public datasets are anonymized
-
-## Testing Large Excel Files
-
-Large Excel files, for example 20 MB+ `.xlsx` files, may fail or take too long.
-
-Recommended solution:
-
-1. Open the file in Excel
-2. Keep only the first 1,000 to 5,000 rows
-3. Save as **CSV UTF-8**
-4. Upload the smaller CSV file
-
-This is enough to test profiling, quality score, missing values, and domain tagging.
-
 ## Generate Synthetic Data
 
 If needed, generate project synthetic datasets inside the backend container:
@@ -391,14 +346,6 @@ Also check backend logs:
 ```bash
 docker compose logs backend --tail=120
 ```
-
-### CSV is detected as one column
-
-The file probably uses `;` separator. Convert it to comma-separated CSV UTF-8 using Excel, then upload again.
-
-### Upload fails for a large Excel file
-
-Convert the file to CSV and keep a smaller sample, for example 1,000 or 5,000 rows.
 
 ## Project Structure
 
