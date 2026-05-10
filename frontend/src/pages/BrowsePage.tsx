@@ -202,7 +202,7 @@ export default function BrowsePage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {datasets.map((dataset) => (
-                  <DatasetCardExpanded key={dataset.id} dataset={dataset} />
+                  <DatasetCardExpanded key={dataset.id} dataset={dataset} tags={dataset.tags ?? []} />
                 ))}
               </div>
             )}

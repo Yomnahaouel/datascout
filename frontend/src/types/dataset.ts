@@ -19,6 +19,7 @@ export interface Dataset {
   error_message: string | null;
   created_at: string;
   processed_at: string | null;
+  tags?: Tag[];
 }
 
 export interface DatasetCreate {

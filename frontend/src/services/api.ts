@@ -23,11 +23,17 @@ class ApiError extends Error {
   }
 }
 
+type ApiTag = Partial<Tag> & {
+  tag_category?: Tag["category"];
+  tag_value?: string;
+};
+
 type ApiDataset = Partial<DatasetDetail> & {
   file_size_bytes?: number;
   uploaded_at?: string;
   quality_scores?: QualityScoreDetail[];
   dashboard_configs?: DashboardConfig[];
+  tags?: ApiTag[];
 };
 
 function percentScore(score: number | null | undefined): number | null {
@@ -48,6 +54,19 @@ function normalizeQuality(q: QualityScoreDetail | null | undefined): QualityScor
   };
 }
 
+function normalizeTags(tags: ApiTag[] | undefined): Tag[] {
+  return (tags ?? [])
+    .map((tag) => ({
+      id: tag.id ?? 0,
+      category: tag.category ?? tag.tag_category,
+      value: tag.value ?? tag.tag_value ?? "",
+      confidence: tag.confidence ?? 1,
+      method: tag.method ?? "unknown",
+      created_at: tag.created_at ?? new Date(0).toISOString(),
+    }))
+    .filter((tag): tag is Tag => Boolean(tag.category && tag.value));
+}
+
 function normalizeDataset<T extends ApiDataset>(dataset: T): T & DatasetDetail {
   const quality = normalizeQuality(dataset.quality_score_detail ?? dataset.quality_scores?.[0]);
   return {
@@ -58,6 +77,7 @@ function normalizeDataset<T extends ApiDataset>(dataset: T): T & DatasetDetail {
     quality_score_detail: quality,
     quality_details: quality,
     dashboard_config: dataset.dashboard_config ?? dataset.dashboard_configs?.[0] ?? null,
+    tags: normalizeTags(dataset.tags),
   } as T & DatasetDetail;
 }
 

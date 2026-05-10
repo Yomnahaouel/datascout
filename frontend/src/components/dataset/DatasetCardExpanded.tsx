@@ -47,11 +47,7 @@ export default function DatasetCardExpanded({ dataset, tags = [] }: DatasetCardE
     return colors[format] || "bg-gray-100 text-gray-700";
   };
 
-  // Mock tags if none provided
-  const displayTags = tags.length > 0 ? tags : [
-    { value: "Finance", category: "domain" as const },
-  ];
-
+  const displayTags = tags;
   const hasPII = displayTags.some((t) => t.category === "pii_type");
 
   return (
