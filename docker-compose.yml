@@ -85,6 +85,7 @@ services:
       DEBUG: ${DEBUG:-false}
       DATASCOUT_HEAVY_ML: ${DATASCOUT_HEAVY_ML:-false}
       DATASCOUT_SEMANTIC_SEARCH: ${DATASCOUT_SEMANTIC_SEARCH:-false}
+      DATASCOUT_GENERATE_DASHBOARD: ${DATASCOUT_GENERATE_DASHBOARD:-false}
     ports:
       - "8000:8000"
     depends_on:

@@ -139,17 +139,22 @@ class IngestionPipeline:
             else:
                 logger.info("Stage 5: Semantic indexing skipped (DATASCOUT_SEMANTIC_SEARCH=false)")
 
-            # Stage 6: Generate dashboard
-            logger.info("Stage 6: Running dashboard engine")
-            dashboard = await self.dashboard.generate_dashboard(
-                df,
-                title=dataset.name,
-                row_count=dataset.row_count,
-                column_count=dataset.column_count,
-                file_size=getattr(dataset, "file_size_bytes", None) or getattr(dataset, "file_size", None),
-                quality_score=dataset.quality_score,
-            )
-            await self._save_dashboard_config(dataset, dashboard)
+            # Stage 6: Generate dashboard. Optional in local testing because the
+            # user can validate profiling/PII/domain/quality without waiting for
+            # dashboard chart generation.
+            if os.getenv("DATASCOUT_GENERATE_DASHBOARD", "false").lower() in {"1", "true", "yes"}:
+                logger.info("Stage 6: Running dashboard engine")
+                dashboard = await self.dashboard.generate_dashboard(
+                    df,
+                    title=dataset.name,
+                    row_count=dataset.row_count,
+                    column_count=dataset.column_count,
+                    file_size=getattr(dataset, "file_size_bytes", None) or getattr(dataset, "file_size", None),
+                    quality_score=dataset.quality_score,
+                )
+                await self._save_dashboard_config(dataset, dashboard)
+            else:
+                logger.info("Stage 6: Dashboard generation skipped (DATASCOUT_GENERATE_DASHBOARD=false)")
 
             # Mark as completed
             dataset.status = DatasetStatus.COMPLETED
