@@ -1,0 +1,21 @@
+employee_id,employee_name,work_email,department,salary,hire_date
+EMP-5000,John Smith,john.smith@company.test,Risk,69739,2023-02-22
+EMP-5001,Sarah Johnson,sarah.johnson@company.test,IT,,2024-06-22
+EMP-5002,Michael Brown,michael.brown@company.test,Finance,61363,2024-05-22
+EMP-5003,Emma Wilson,emma.wilson@company.test,HR,64753,2023-12-10
+EMP-5004,David Miller,david.miller@company.test,Operations,38683,2021-07-22
+EMP-5005,Olivia Davis,olivia.davis@company.test,HR,44810,2024-10-10
+EMP-5006,James Taylor,james.taylor@company.test,HR,22053,2022-05-07
+EMP-5007,Sophia Anderson,sophia.anderson@company.test,HR,64237,2023-08-15
+EMP-5008,Daniel Thomas,daniel.thomas@company.test,Risk,,2024-08-26
+EMP-5009,Mia Martin,mia.martin@company.test,Risk,33114,2022-09-22
+EMP-5010,Robert Jackson,robert.jackson@company.test,Operations,65933,2020-04-22
+EMP-5011,Ava White,ava.white@company.test,IT,51444,2021-03-01
+EMP-5012,William Harris,william.harris@company.test,Finance,,2021-08-20
+EMP-5013,Charlotte Clark,charlotte.clark@company.test,Finance,81692,2023-11-19
+EMP-5014,Joseph Lewis,joseph.lewis@company.test,Risk,72328,2023-07-08
+EMP-5015,Amelia Walker,amelia.walker@company.test,Risk,22726,2020-07-08
+EMP-5016,Thomas Hall,thomas.hall@company.test,Risk,,2025-09-15
+EMP-5017,Harper Allen,harper.allen@company.test,Finance,54662,2020-08-05
+EMP-5018,George Young,george.young@company.test,HR,63588,2023-10-27
+EMP-5019,Evelyn King,evelyn.king@company.test,Operations,77933,2024-08-06

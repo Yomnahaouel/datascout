@@ -262,3 +262,42 @@ class DashboardConfig(Base):
 
     # Relationships
     dataset = relationship("Dataset", back_populates="dashboard_configs")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional Data Source / Job / Result Models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DataSource(Base):
+    """External or file-based source registered in DataScout."""
+    __tablename__ = "data_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    source_type = Column(String(100), nullable=False)
+    connection_string = Column(String(512), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Job(Base):
+    """Processing job linked to a data source."""
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    status = Column(String(50), default="pending", nullable=False)
+    source_id = Column(Integer, ForeignKey("data_sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Result(Base):
+    """Stored output/summary for a processing job."""
+    __tablename__ = "results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    data = Column(JSON, nullable=True)
+    summary = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

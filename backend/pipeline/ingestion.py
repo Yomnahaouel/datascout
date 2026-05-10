@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -322,14 +323,19 @@ class IngestionPipeline:
             )
             self.db.add(tag)
 
-        # Update column profiles with PII info
+        # Update column profiles with PII info.
+        # Use a direct UPDATE instead of relying on dataset.column_profiles being
+        # refreshed. The dataset is loaded before new ColumnProfile rows are
+        # inserted, so the relationship can be stale during this same pipeline run.
         for col_name, pii_types in pii_report.pii_by_column.items():
-            # Find matching column profile
-            for cp in dataset.column_profiles:
-                if cp.column_name == col_name:
-                    cp.is_pii = True
-                    cp.pii_type = ", ".join(pii_types)
-                    break
+            await self.db.execute(
+                update(ColumnProfile)
+                .where(
+                    ColumnProfile.dataset_id == dataset.id,
+                    ColumnProfile.column_name == col_name,
+                )
+                .values(is_pii=True, pii_type=", ".join(pii_types))
+            )
 
         # Spec: if any column has PII, add dataset-level tag sensitivity/contains_pii
         if pii_report.pii_by_column:

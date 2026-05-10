@@ -40,6 +40,12 @@ class JobResponse(BaseModel):
 
 # --- Result ---
 
+class ResultCreate(BaseModel):
+    job_id: int
+    data: dict | None = None
+    summary: str | None = None
+
+
 class ResultResponse(BaseModel):
     id: int
     job_id: int
