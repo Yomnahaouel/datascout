@@ -1,0 +1,25 @@
+customer_id,full_name,email,phone,credit_card_number,account_balance,city,account_open_date
+CUST-1000,John Smith,john.smith@example.com,202-555-1000,4111 1111 1111 1000,9681.55,Tunis,2024-01-01
+CUST-1001,Sarah Johnson,sarah.johnson@example.com,202-555-1001,4111 1111 1111 1001,11187.87,Sousse,2024-02-02
+CUST-1002,Michael Brown,michael.brown@example.com,202-555-1002,4111 1111 1111 1002,,Sousse,2024-03-03
+CUST-1003,Emma Wilson,emma.wilson@example.com,202-555-1003,4111 1111 1111 1003,2308.18,Tunis,2024-04-04
+CUST-1004,David Miller,david.miller@example.com,202-555-1004,4111 1111 1111 1004,10231.32,Tunis,2024-05-05
+CUST-1005,Olivia Davis,olivia.davis@example.com,202-555-1005,4111 1111 1111 1005,8959.76,Tunis,2024-06-06
+CUST-1006,James Taylor,james.taylor@example.com,202-555-1006,4111 1111 1111 1006,689.51,Sousse,2024-07-07
+CUST-1007,Sophia Anderson,sophia.anderson@example.com,202-555-1007,4111 1111 1111 1007,,Sousse,2024-08-08
+CUST-1008,Daniel Thomas,daniel.thomas@example.com,202-555-1008,4111 1111 1111 1008,7703.99,Tunis,2024-09-09
+CUST-1009,Mia Martin,mia.martin@example.com,202-555-1009,4111 1111 1111 1009,8528.36,Nabeul,2024-10-10
+CUST-1010,Robert Jackson,robert.jackson@example.com,202-555-1010,4111 1111 1111 1010,3501.5,Sfax,2024-11-11
+CUST-1011,Ava White,ava.white@example.com,202-555-1011,4111 1111 1111 1011,12189.1,Tunis,2024-12-12
+CUST-1012,William Harris,william.harris@example.com,202-555-1012,4111 1111 1111 1012,11442.41,Sousse,2024-01-13
+CUST-1013,Charlotte Clark,charlotte.clark@example.com,202-555-1013,4111 1111 1111 1013,,Nabeul,2024-02-14
+CUST-1014,Joseph Lewis,joseph.lewis@example.com,202-555-1014,4111 1111 1111 1014,5268.7,Sousse,2024-03-15
+CUST-1015,Amelia Walker,amelia.walker@example.com,202-555-1015,4111 1111 1111 1015,3425.88,Sfax,2024-04-16
+CUST-1016,Thomas Hall,thomas.hall@example.com,202-555-1016,4111 1111 1111 1016,1757.6,Nabeul,2024-05-17
+CUST-1017,Harper Allen,harper.allen@example.com,202-555-1017,4111 1111 1111 1017,1676.57,Sfax,2024-06-18
+CUST-1018,George Young,george.young@example.com,202-555-1018,4111 1111 1111 1018,9154.96,Tunis,2024-07-19
+CUST-1019,Evelyn King,evelyn.king@example.com,202-555-1019,4111 1111 1111 1019,11013.54,Tunis,2024-08-20
+CUST-1020,Henry Wright,henry.wright@example.com,202-555-1020,4111 1111 1111 1020,,Nabeul,2024-09-21
+CUST-1021,Abigail Scott,abigail.scott@example.com,202-555-1021,4111 1111 1111 1021,1412.3,Sfax,2024-10-22
+CUST-1022,Samuel Green,samuel.green@example.com,202-555-1022,4111 1111 1111 1022,12483.72,Sfax,2024-11-23
+CUST-1023,Elizabeth Baker,elizabeth.baker@example.com,202-555-1023,4111 1111 1111 1023,8765.94,Tunis,2024-12-24
