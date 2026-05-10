@@ -1,0 +1,130 @@
+# DataScout fast development stack.
+# Run with: docker compose -f docker-compose.dev.yml up
+# This file is standalone on purpose, so it does not inherit the production
+# frontend/nginx service and avoids stale builds on port 3000.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: datascout-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-datascout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datascout}
+      POSTGRES_DB: ${POSTGRES_DB:-datascout}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datascout} -d ${POSTGRES_DB:-datascout}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  chromadb:
+    image: chromadb/chroma:0.4.24
+    container_name: datascout-chromadb
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "false"
+      PERSIST_DIRECTORY: /chroma/chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - datascout-net
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.cpu
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: datascout-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-datascout}:${POSTGRES_PASSWORD:-datascout}@db:5432/${POSTGRES_DB:-datascout}
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+      HF_HOME: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface/transformers
+      SENTENCE_TRANSFORMERS_HOME: /cache/huggingface/sentence_transformers
+      DEBUG: ${DEBUG:-false}
+      DATASCOUT_HEAVY_ML: ${DATASCOUT_HEAVY_ML:-false}
+      DATASCOUT_SEMANTIC_SEARCH: ${DATASCOUT_SEMANTIC_SEARCH:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - pip_cache:/root/.cache/pip
+      - model_cache:/cache/huggingface
+    networks:
+      - datascout-net
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --workers 1 --log-level info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    image: node:22-alpine
+    container_name: datascout-frontend
+    restart: unless-stopped
+    working_dir: /app
+    # Install frontend dependencies only the first time the node_modules volume is empty.
+    # If package.json changes, run: docker compose -f docker-compose.dev.yml exec frontend npm install
+    # or rebuild with: docker compose -f docker-compose.dev.yml up --build frontend
+    command: sh -c "if [ ! -d node_modules/vite ]; then npm install; fi; npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+      VITE_API_BASE: http://localhost:8000/api/v1
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - npm_cache:/root/.npm
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - datascout-net
+
+networks:
+  datascout-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  chroma_data:
+    driver: local
+  pip_cache:
+    driver: local
+  npm_cache:
+    driver: local
+  model_cache:
+    driver: local
+  frontend_node_modules:
+    driver: local
