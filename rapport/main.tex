@@ -1,0 +1,591 @@
+\documentclass[12pt,a4paper]{report}
+
+% ===================== Packages =====================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit}
+
+\geometry{margin=2.5cm}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\definecolor{primary}{HTML}{1E3A8A}
+\definecolor{secondary}{HTML}{0F766E}
+\definecolor{lightgray}{HTML}{F3F4F6}
+
+% ===================== Informations =====================
+\title{\textbf{Rapport Final du Projet DataScout}\\
+\large Catalogue intelligent de données bancaires}
+\author{Réalisé par : Yomna Haouel \\
+Encadré par : \textit{Nom du professeur}}
+\date{Année universitaire 2025--2026}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ===================== Introduction =====================
+\chapter*{Introduction générale}
+\addcontentsline{toc}{chapter}{Introduction générale}
+
+Avec l'augmentation massive du volume de données dans les institutions financières, la gestion, la découverte et l'évaluation de la qualité des jeux de données deviennent des enjeux essentiels. Les banques manipulent des données sensibles telles que les informations clients, les transactions, les dossiers KYC, les crédits et les opérations de paiement. Ces données doivent être facilement accessibles aux équipes autorisées, tout en respectant les contraintes de sécurité, de confidentialité et de gouvernance.
+
+Le projet \textbf{DataScout} répond à ce besoin en proposant une application web intelligente permettant de cataloguer automatiquement des jeux de données bancaires. L'application permet d'importer des fichiers, d'analyser leur structure, de détecter les données personnelles sensibles, de classifier leur domaine métier, de calculer un score de qualité et de faciliter leur recherche à travers une interface web moderne.
+
+Ce rapport présente la globalité du projet selon trois axes : la présentation générale de l'application, les données utilisées et les méthodes d'intelligence artificielle intégrées.
+
+% ===================== Chapitre 1 =====================
+\chapter{Présentation générale}
+
+\section{Présentation du projet}
+
+\textbf{DataScout} est une application full-stack destinée à la gouvernance et à l'exploration de données bancaires. Elle fonctionne comme un catalogue intelligent de datasets. L'utilisateur peut téléverser un fichier de données, puis le système effectue automatiquement plusieurs traitements :
+
+\begin{itemize}
+    \item lecture et validation du fichier ;
+    \item profilage statistique des colonnes ;
+    \item détection des données personnelles sensibles, appelées PII ;
+    \item classification du domaine métier du dataset ;
+    \item calcul d'un score global de qualité ;
+    \item stockage des métadonnées dans une base PostgreSQL ;
+    \item affichage des résultats dans une interface React ;
+    \item recherche et filtrage des datasets.
+\end{itemize}
+
+L'application a été développée avec une architecture moderne composée d'un backend \textbf{FastAPI}, d'un frontend \textbf{React/Vite}, d'une base de données \textbf{PostgreSQL} et d'un service optionnel \textbf{ChromaDB} pour la recherche sémantique.
+
+\section{Utilité et objectifs de l'application}
+
+L'objectif principal de DataScout est de faciliter la découverte, la compréhension et la gestion des datasets bancaires. Dans une organisation financière, les données sont souvent nombreuses, dispersées et parfois mal documentées. Cela peut ralentir le travail des analystes, des data scientists et des responsables métiers.
+
+Les objectifs spécifiques sont les suivants :
+
+\begin{enumerate}
+    \item \textbf{Centraliser les métadonnées} des datasets dans un catalogue unique.
+    \item \textbf{Automatiser le profilage} des colonnes afin d'éviter une analyse manuelle longue.
+    \item \textbf{Détecter les informations sensibles} pour renforcer la conformité et la sécurité.
+    \item \textbf{Évaluer la qualité des données} selon plusieurs dimensions.
+    \item \textbf{Classer automatiquement les datasets} selon leur domaine métier.
+    \item \textbf{Améliorer la recherche} grâce aux tags, aux filtres et à la recherche textuelle ou sémantique.
+    \item \textbf{Préparer la visualisation} à travers des dashboards générés automatiquement.
+\end{enumerate}
+
+\section{Problématique abordée}
+
+La problématique principale est la suivante :
+
+\begin{quote}
+\textit{Comment aider une organisation bancaire à identifier, comprendre, classer et contrôler rapidement ses jeux de données, tout en détectant les informations sensibles et en évaluant leur qualité ?}
+\end{quote}
+
+Cette problématique regroupe plusieurs défis :
+
+\begin{itemize}
+    \item difficulté à savoir quels datasets existent dans l'organisation ;
+    \item absence de description claire des colonnes et de leur qualité ;
+    \item risque de manipuler des données personnelles sans les identifier ;
+    \item perte de temps dans la recherche de datasets pertinents ;
+    \item besoin d'un outil simple pour les utilisateurs métiers et techniques.
+\end{itemize}
+
+DataScout propose une réponse à ces défis en automatisant les analyses de base et en présentant les résultats dans une interface compréhensible.
+
+\section{Architecture générale}
+
+L'architecture du projet est composée de quatre parties principales :
+
+\begin{itemize}
+    \item \textbf{Frontend React} : interface utilisateur pour l'upload, la recherche, le listing et la visualisation des datasets.
+    \item \textbf{Backend FastAPI} : API REST qui reçoit les fichiers, lance le pipeline d'analyse et renvoie les résultats.
+    \item \textbf{PostgreSQL} : base relationnelle pour stocker les datasets, profils de colonnes, tags, scores qualité et configurations de dashboards.
+    \item \textbf{ChromaDB} : base vectorielle optionnelle pour la recherche sémantique par embeddings.
+\end{itemize}
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+    \node[draw, rounded corners, fill=blue!10, minimum width=3.2cm, minimum height=1cm] (user) {Utilisateur};
+    \node[draw, rounded corners, fill=green!10, right=of user, minimum width=3.2cm, minimum height=1cm] (front) {Frontend React};
+    \node[draw, rounded corners, fill=yellow!20, right=of front, minimum width=3.2cm, minimum height=1cm] (api) {Backend FastAPI};
+    \node[draw, rounded corners, fill=orange!20, below=of api, minimum width=3.2cm, minimum height=1cm] (pipeline) {Pipeline d'analyse};
+    \node[draw, rounded corners, fill=purple!15, right=of api, minimum width=3.2cm, minimum height=1cm] (db) {PostgreSQL};
+    \node[draw, rounded corners, fill=red!10, below=of db, minimum width=3.2cm, minimum height=1cm] (chroma) {ChromaDB};
+
+    \draw[-{Latex}] (user) -- (front);
+    \draw[-{Latex}] (front) -- (api);
+    \draw[-{Latex}] (api) -- (pipeline);
+    \draw[-{Latex}] (pipeline) -- (db);
+    \draw[-{Latex}] (pipeline) -- (chroma);
+    \draw[-{Latex}] (db) -- (api);
+    \draw[-{Latex}] (api) -- (front);
+\end{tikzpicture}
+\caption{Architecture générale de DataScout}
+\end{figure}
+
+\section{Diagramme de cas d'utilisation global}
+
+Les acteurs principaux sont :
+
+\begin{itemize}
+    \item \textbf{Utilisateur} : consulte, recherche et téléverse des datasets.
+    \item \textbf{Administrateur ou Data Steward} : contrôle la qualité, supprime ou retraite les datasets.
+    \item \textbf{Système DataScout} : effectue automatiquement l'analyse, la détection PII, la classification et le scoring.
+\end{itemize}
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[node distance=1.2cm, every node/.style={font=\small}]
+    \node[draw, ellipse, fill=blue!10] (upload) {Uploader un dataset};
+    \node[draw, ellipse, fill=blue!10, below=of upload] (search) {Rechercher un dataset};
+    \node[draw, ellipse, fill=blue!10, below=of search] (view) {Consulter le profil};
+    \node[draw, ellipse, fill=blue!10, below=of view] (dashboard) {Visualiser dashboard};
+    \node[draw, ellipse, fill=green!10, right=3.5cm of upload] (profile) {Profiler les colonnes};
+    \node[draw, ellipse, fill=green!10, below=of profile] (pii) {Détecter PII};
+    \node[draw, ellipse, fill=green!10, below=of pii] (quality) {Calculer qualité};
+    \node[draw, ellipse, fill=green!10, below=of quality] (domain) {Classifier domaine};
+
+    \node[draw, rounded corners, fill=blue!5, left=2.5cm of search, align=center] (user) {Utilisateur};
+    \node[right=2.5cm of pii] (system) {Système\\DataScout};
+
+    \draw[-{Latex}] (user) -- (upload);
+    \draw[-{Latex}] (user) -- (search);
+    \draw[-{Latex}] (user) -- (view);
+    \draw[-{Latex}] (user) -- (dashboard);
+
+    \draw[-{Latex}, dashed] (upload) -- (profile);
+    \draw[-{Latex}, dashed] (upload) -- (pii);
+    \draw[-{Latex}, dashed] (upload) -- (quality);
+    \draw[-{Latex}, dashed] (upload) -- (domain);
+\end{tikzpicture}
+\caption{Diagramme simplifié des cas d'utilisation}
+\end{figure}
+
+\section{Technologies utilisées}
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Technologie} & \textbf{Rôle dans le projet} \\
+\midrule
+React / TypeScript & Développement de l'interface utilisateur. \\
+Vite & Outil de build rapide pour le frontend. \\
+FastAPI & Création de l'API REST backend. \\
+Pandas & Lecture et analyse des fichiers de données. \\
+SQLAlchemy & Mapping objet-relationnel avec PostgreSQL. \\
+PostgreSQL & Stockage des métadonnées et résultats d'analyse. \\
+ChromaDB & Stockage vectoriel pour la recherche sémantique. \\
+Scikit-learn & Détection des outliers avec IsolationForest. \\
+SciPy & Tests statistiques et analyse de distribution. \\
+spaCy & Détection d'entités nommées, notamment les noms de personnes. \\
+Transformers / BART & Classification zero-shot optionnelle. \\
+Docker Compose & Orchestration des services. \\
+\bottomrule
+\end{longtable}
+
+% ===================== Chapitre 2 =====================
+\chapter{Données}
+
+\section{Collecte des données}
+
+Le projet utilise principalement des données synthétiques et des fichiers de test. Ce choix est important car le domaine bancaire contient des informations sensibles. Utiliser de vraies données clients pourrait poser des problèmes de confidentialité, de sécurité et de conformité.
+
+Les données synthétiques sont générées pour simuler des cas bancaires réalistes :
+
+\begin{itemize}
+    \item clients bancaires ;
+    \item comptes et soldes ;
+    \item transactions par carte bancaire ;
+    \item virements ;
+    \item dossiers KYC ;
+    \item scores de crédit ;
+    \item segments clients ;
+    \item retraits ATM ;
+    \item données de risque ou de fraude.
+\end{itemize}
+
+Le dossier \texttt{data/synthetic/} contient les datasets de démonstration, tandis que le dossier \texttt{data/test\_datasets/} contient de petits fichiers préparés pour tester la classification de domaine, la détection PII et le score de qualité.
+
+\section{Format des fichiers}
+
+DataScout accepte plusieurs formats :
+
+\begin{itemize}
+    \item CSV ;
+    \item TSV ;
+    \item JSON ;
+    \item Parquet ;
+    \item Excel.
+\end{itemize}
+
+Lors de l'upload, le backend vérifie l'extension du fichier. Si le format n'est pas supporté, l'API retourne une erreur. Sinon, le fichier est sauvegardé dans le dossier d'uploads et un enregistrement est créé dans la table \texttt{datasets}.
+
+\section{Nettoyage et prétraitement}
+
+Le projet ne modifie pas directement les données originales. Il effectue plutôt une analyse automatique afin de produire des métadonnées. Les principales opérations de prétraitement sont :
+
+\begin{enumerate}
+    \item Chargement du fichier avec Pandas.
+    \item Identification du nombre de lignes et de colonnes.
+    \item Détection des valeurs manquantes.
+    \item Détection des doublons.
+    \item Conversion ou interprétation des types de colonnes.
+    \item Calcul de statistiques pour les colonnes numériques.
+    \item Extraction d'échantillons de valeurs.
+    \item Analyse des formats pour détecter les emails, téléphones, dates, identifiants, etc.
+\end{enumerate}
+
+Le choix de ne pas modifier les données sources est volontaire. DataScout est un outil de catalogue et de gouvernance : il analyse les datasets et signale les problèmes, mais ne remplace pas un pipeline ETL complet de correction des données.
+
+\section{Description des variables}
+
+Comme l'application accepte différents datasets, les variables changent selon le fichier. Cependant, le système extrait automatiquement une description pour chaque colonne. Pour chaque variable, les informations suivantes peuvent être stockées :
+
+\begin{itemize}
+    \item nom de la colonne ;
+    \item type brut détecté par Pandas ;
+    \item type sémantique inféré ;
+    \item nombre de valeurs manquantes ;
+    \item pourcentage de valeurs manquantes ;
+    \item nombre de valeurs uniques ;
+    \item moyenne, médiane, écart-type, minimum et maximum pour les colonnes numériques ;
+    \item distribution ou histogramme ;
+    \item nombre d'outliers ;
+    \item exemples de valeurs ;
+    \item indication si la colonne contient des données personnelles sensibles.
+\end{itemize}
+
+\section{Exemples de variables bancaires}
+
+\begin{longtable}{p{4cm}p{4cm}p{6cm}}
+\toprule
+\textbf{Variable} & \textbf{Type possible} & \textbf{Signification} \\
+\midrule
+customer\_id & Identifiant & Identifiant unique du client. \\
+account\_number & Identifiant & Numéro ou référence de compte. \\
+transaction\_amount & Numérique / Monétaire & Montant d'une transaction. \\
+transaction\_date & Date & Date de l'opération. \\
+email & Texte / PII & Adresse email du client. \\
+phone & Texte / PII & Numéro de téléphone. \\
+credit\_score & Numérique & Score de crédit du client. \\
+risk\_level & Catégoriel & Niveau de risque. \\
+kyc\_status & Catégoriel & État de validation KYC. \\
+product\_category & Catégoriel & Catégorie du produit bancaire. \\
+\bottomrule
+\end{longtable}
+
+\section{Choix méthodologiques}
+
+Les choix méthodologiques principaux sont :
+
+\begin{itemize}
+    \item \textbf{Données synthétiques} : utilisées pour éviter l'exposition de vraies données sensibles.
+    \item \textbf{Analyse automatique} : pour réduire le travail manuel d'exploration.
+    \item \textbf{Approche hybride} : combinaison de règles déterministes, statistiques et modèles IA optionnels.
+    \item \textbf{Stockage des métadonnées} : les résultats sont sauvegardés dans PostgreSQL afin d'être consultés rapidement.
+    \item \textbf{Traitement en arrière-plan} : après l'upload, le pipeline s'exécute sans bloquer l'interface utilisateur.
+\end{itemize}
+
+% ===================== Chapitre 3 =====================
+\chapter{Modèles et Intelligence Artificielle}
+
+\section{Vue d'ensemble}
+
+DataScout utilise plusieurs modules intelligents appelés \textit{engines}. Ces modules ne correspondent pas tous à des modèles entraînés dans le cadre du projet. Certains sont basés sur des règles et des statistiques, tandis que d'autres utilisent des modèles pré-entraînés.
+
+Les principaux modules sont :
+
+\begin{itemize}
+    \item \textbf{Profiler Engine} : analyse statistique des colonnes.
+    \item \textbf{Tagger Engine} : classification de domaine et détection PII.
+    \item \textbf{Quality Engine} : calcul du score qualité.
+    \item \textbf{Search Engine} : recherche sémantique optionnelle avec embeddings.
+    \item \textbf{Dashboard Engine} : génération automatique de configurations de visualisation.
+\end{itemize}
+
+\section{Profiler Engine}
+
+Le \textbf{Profiler Engine} analyse chaque dataset avec Pandas, SciPy et Scikit-learn. Il calcule les statistiques générales et par colonne. Pour les colonnes numériques, il calcule notamment la moyenne, la médiane, l'écart-type, les quartiles, la distribution et les valeurs aberrantes.
+
+La détection d'outliers est réalisée avec \textbf{IsolationForest}. Cette méthode permet d'isoler les observations inhabituelles en construisant plusieurs arbres aléatoires. Les observations qui sont isolées rapidement sont considérées comme potentiellement anormales.
+
+\subsection{Variables analysées par le Profiler}
+
+\begin{itemize}
+    \item types de données ;
+    \item taux de valeurs manquantes ;
+    \item nombre de valeurs uniques ;
+    \item statistiques numériques ;
+    \item distribution des valeurs ;
+    \item outliers ;
+    \item valeurs exemples.
+\end{itemize}
+
+\section{Tagger Engine : classification de domaine}
+
+Le \textbf{Tagger Engine} attribue un domaine métier au dataset. Les domaines supportés sont :
+
+\begin{itemize}
+    \item Finance ;
+    \item Risk ;
+    \item Marketing ;
+    \item HR ;
+    \item Operations ;
+    \item Compliance ;
+    \item Products.
+\end{itemize}
+
+Deux approches existent dans le projet :
+
+\subsection{Approche rapide par mots-clés}
+
+Par défaut, DataScout utilise un classifieur déterministe basé sur les noms de colonnes. Par exemple :
+
+\begin{itemize}
+    \item les mots \texttt{credit}, \texttt{transaction}, \texttt{account}, \texttt{payment} orientent vers \textbf{Finance} ;
+    \item les mots \texttt{fraud}, \texttt{risk}, \texttt{default}, \texttt{score} orientent vers \textbf{Risk} ;
+    \item les mots \texttt{employee}, \texttt{salary}, \texttt{department} orientent vers \textbf{HR} ;
+    \item les mots \texttt{kyc}, \texttt{aml}, \texttt{audit}, \texttt{ssn} orientent vers \textbf{Compliance}.
+\end{itemize}
+
+Cette méthode est rapide, stable et adaptée à une démonstration locale.
+
+\subsection{Approche IA optionnelle avec BART}
+
+Le projet contient aussi une option pour utiliser le modèle \textbf{facebook/bart-large-mnli} en classification zero-shot. Cette méthode permet de classifier un texte sans entraîner un modèle spécifique sur nos données. Elle compare le texte du dataset aux labels possibles et choisit le label le plus probable.
+
+Cependant, cette option est désactivée par défaut car le modèle est lourd, nécessite plus de mémoire et ralentit le lancement local. Elle peut être activée avec la variable d'environnement :
+
+\begin{verbatim}
+DATASCOUT_HEAVY_ML=true
+\end{verbatim}
+
+\section{Détection des données personnelles sensibles}
+
+La détection PII combine deux techniques :
+
+\begin{enumerate}
+    \item \textbf{Expressions régulières} pour détecter les emails, téléphones, numéros SSN et cartes bancaires.
+    \item \textbf{spaCy NER} pour détecter les noms de personnes.
+\end{enumerate}
+
+Le système prend un échantillon de valeurs par colonne. Si plus de 50\% des valeurs de l'échantillon correspondent à un motif PII, la colonne est marquée comme sensible.
+
+\begin{longtable}{p{4cm}p{9cm}}
+\toprule
+\textbf{Type PII} & \textbf{Méthode de détection} \\
+\midrule
+Email & Regex sur le format adresse email. \\
+Téléphone & Regex sur les formats de numéros. \\
+SSN & Regex du type XXX-XX-XXXX. \\
+Carte bancaire & Regex sur 16 chiffres groupés ou séparés. \\
+Nom de personne & Reconnaissance d'entités nommées avec spaCy. \\
+\bottomrule
+\end{longtable}
+
+\section{Quality Engine : score de qualité}
+
+Le \textbf{Quality Engine} calcule un score global de qualité entre 0 et 1. Ce score n'est pas un modèle entraîné, mais une méthode déterministe basée sur cinq dimensions.
+
+\begin{longtable}{p{4cm}p{2cm}p{8cm}}
+\toprule
+\textbf{Dimension} & \textbf{Poids} & \textbf{Description} \\
+\midrule
+Completeness & 30\% & Mesure le taux de cellules non nulles. \\
+Consistency & 20\% & Vérifie la cohérence des formats dans les colonnes. \\
+Uniqueness & 20\% & Analyse les doublons et la diversité des valeurs. \\
+Validity & 20\% & Vérifie si les valeurs respectent des formats attendus. \\
+Timeliness & 10\% & Évalue la fraîcheur des données lorsqu'une colonne date existe. \\
+\bottomrule
+\end{longtable}
+
+La formule générale est :
+
+\[
+ScoreGlobal = \sum_{i=1}^{5} Score_i \times Poids_i
+\]
+
+Le score est ensuite associé à une note : A, B, C, D ou F.
+
+\section{Search Engine : recherche sémantique}
+
+La recherche sémantique est prévue avec \textbf{sentence-transformers/all-MiniLM-L6-v2} et \textbf{ChromaDB}. Le principe consiste à transformer la description d'un dataset en vecteur numérique, appelé embedding. Lorsqu'un utilisateur effectue une recherche, la requête est également transformée en vecteur, puis comparée aux vecteurs des datasets.
+
+Cette approche permet de retrouver des datasets proches en sens, même si les mots utilisés ne sont pas exactement identiques.
+
+Pour une démonstration locale rapide, cette option peut être désactivée avec :
+
+\begin{verbatim}
+DATASCOUT_SEMANTIC_SEARCH=false
+\end{verbatim}
+
+\section{Méthodes d'entraînement}
+
+Dans la version actuelle du projet, aucun modèle supervisé n'a été entraîné à partir de zéro. Le projet utilise plutôt :
+
+\begin{itemize}
+    \item des règles déterministes pour la classification rapide de domaine ;
+    \item des expressions régulières pour certains types de PII ;
+    \item le modèle pré-entraîné spaCy pour les entités nommées ;
+    \item le modèle pré-entraîné BART pour la classification zero-shot optionnelle ;
+    \item le modèle pré-entraîné MiniLM pour les embeddings de recherche optionnels.
+\end{itemize}
+
+Ce choix est justifié par le contexte du projet : l'objectif principal est de construire un système fonctionnel de catalogue intelligent, pas d'entraîner un modèle bancaire propriétaire. Les modèles pré-entraînés permettent de gagner du temps tout en ajoutant des capacités d'IA utiles.
+
+\section{Métriques d'évaluation}
+
+Plusieurs métriques peuvent être utilisées selon le module évalué.
+
+\subsection{Classification de domaine}
+
+Pour la classification de domaine, la métrique utilisée est l'\textbf{accuracy} :
+
+\[
+Accuracy = \frac{Nombre\ de\ prédictions\ correctes}{Nombre\ total\ de\ prédictions}
+\]
+
+Un script d'évaluation compare les domaines prédits sur des fichiers de test avec les domaines attendus. Les exemples de tests sont :
+
+\begin{longtable}{p{7cm}p{4cm}}
+\toprule
+\textbf{Dataset de test} & \textbf{Domaine attendu} \\
+\midrule
+01\_pii\_banking\_contacts.csv & Finance \\
+02\_missing\_values\_quality\_test.csv & Finance \\
+03\_risk\_fraud\_domain\_test.csv & Risk \\
+04\_compliance\_kyc\_ssn\_test.csv & Compliance \\
+05\_hr\_employee\_pii\_test.csv & HR \\
+06\_clean\_products\_operations\_baseline.csv & Products \\
+\bottomrule
+\end{longtable}
+
+\subsection{Détection PII}
+
+Pour la détection PII, les métriques possibles sont :
+
+\begin{itemize}
+    \item \textbf{Précision} : proportion des colonnes détectées comme PII qui sont réellement PII.
+    \item \textbf{Rappel} : proportion des colonnes PII réellement détectées.
+    \item \textbf{F1-score} : moyenne harmonique entre précision et rappel.
+\end{itemize}
+
+\subsection{Score qualité}
+
+Le score qualité n'est pas évalué par accuracy car il ne s'agit pas d'une prédiction de classe. Il est évalué par cohérence logique : un dataset avec beaucoup de valeurs manquantes ou invalides doit obtenir un score plus faible qu'un dataset propre.
+
+\section{Comparaison des méthodes}
+
+\begin{longtable}{p{4cm}p{5cm}p{5cm}}
+\toprule
+\textbf{Méthode} & \textbf{Avantages} & \textbf{Limites} \\
+\midrule
+Règles par mots-clés & Très rapide, stable, facile à expliquer. & Dépend fortement des noms de colonnes. \\
+BART zero-shot & Plus flexible, comprend mieux le contexte textuel. & Lourd, plus lent, nécessite plus de ressources. \\
+Regex PII & Simple, rapide et précis sur formats connus. & Ne détecte pas tous les formats possibles. \\
+spaCy NER & Permet de détecter les noms de personnes. & Peut faire des erreurs selon la langue ou le contexte. \\
+MiniLM + ChromaDB & Recherche sémantique plus intelligente. & Demande plus de temps de calcul et d'indexation. \\
+\bottomrule
+\end{longtable}
+
+\section{Justification du modèle retenu}
+
+Pour le mode de démonstration, le choix principal est de privilégier les méthodes rapides et explicables : mots-clés pour le domaine, regex pour PII, statistiques pour la qualité. Ce choix est pertinent car :
+
+\begin{itemize}
+    \item le projet doit être facilement exécutable localement ;
+    \item le professeur peut tester l'upload sans attendre le téléchargement de grands modèles ;
+    \item les règles sont simples à expliquer pendant la soutenance ;
+    \item les options IA lourdes restent disponibles pour une version plus avancée.
+\end{itemize}
+
+Ainsi, DataScout adopte une approche hybride : rapide et déterministe par défaut, enrichie par des modèles IA pré-entraînés lorsque l'environnement le permet.
+
+\section{Analyse critique}
+
+Le projet présente plusieurs points forts :
+
+\begin{itemize}
+    \item architecture complète frontend/backend/database ;
+    \item pipeline automatique après upload ;
+    \item détection PII utile pour la gouvernance bancaire ;
+    \item score qualité multi-dimensionnel ;
+    \item interface utilisateur claire ;
+    \item données synthétiques adaptées au domaine bancaire.
+\end{itemize}
+
+Cependant, il existe aussi des limites :
+
+\begin{itemize}
+    \item la classification par mots-clés peut être incorrecte si les colonnes sont mal nommées ;
+    \item les regex ne couvrent pas tous les formats internationaux ;
+    \item la recherche sémantique et BART peuvent être coûteux en ressources ;
+    \item l'application ne gère pas encore l'authentification et les rôles utilisateurs ;
+    \item la correction automatique des données n'est pas incluse.
+\end{itemize}
+
+\section{Perspectives d'amélioration}
+
+Les améliorations possibles sont :
+
+\begin{itemize}
+    \item ajouter une authentification avec rôles : admin, analyste, lecteur ;
+    \item améliorer la détection PII avec plus de formats ;
+    \item entraîner un modèle spécifique sur des datasets bancaires annotés ;
+    \item ajouter des métriques plus détaillées dans l'interface ;
+    \item activer la recherche sémantique en production ;
+    \item ajouter un historique d'audit des uploads et suppressions ;
+    \item permettre l'export des rapports de qualité en PDF.
+\end{itemize}
+
+% ===================== Conclusion =====================
+\chapter*{Conclusion générale}
+\addcontentsline{toc}{chapter}{Conclusion générale}
+
+DataScout est une application complète de catalogue intelligent de données bancaires. Elle répond à une problématique réelle liée à la gouvernance, à la qualité et à la protection des données. Grâce à son pipeline automatique, elle permet d'analyser rapidement un dataset, de détecter les informations sensibles, de classifier son domaine métier et de calculer un score de qualité.
+
+Le projet combine des technologies modernes comme React, FastAPI, PostgreSQL et Docker avec des méthodes d'intelligence artificielle et d'analyse statistique. L'approche retenue est volontairement hybride : les traitements rapides et explicables sont utilisés par défaut, tandis que les modèles plus lourds comme BART et les embeddings sémantiques peuvent être activés selon les ressources disponibles.
+
+Ce projet démontre ainsi une compréhension globale du développement full-stack, de la gestion des données, de la qualité des données et des bases de l'intelligence artificielle appliquée au domaine bancaire.
+
+% ===================== Annexe =====================
+\appendix
+\chapter{Principaux fichiers du projet}
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Fichier / Dossier} & \textbf{Rôle} \\
+\midrule
+\texttt{backend/main.py} & Point d'entrée FastAPI. \\
+\texttt{backend/config.py} & Configuration globale de l'application. \\
+\texttt{backend/api/routes/datasets.py} & Endpoints principaux pour upload, recherche, profil, qualité et suppression. \\
+\texttt{backend/db/models.py} & Modèles SQLAlchemy : Dataset, ColumnProfile, Tag, QualityScore. \\
+\texttt{backend/pipeline/ingestion.py} & Pipeline d'analyse après upload. \\
+\texttt{backend/engines/profiler\_engine.py} & Profilage statistique des colonnes. \\
+\texttt{backend/engines/tagger\_engine.py} & Classification domaine et détection PII. \\
+\texttt{backend/engines/quality\_engine.py} & Calcul du score de qualité. \\
+\texttt{backend/engines/search\_engine.py} & Recherche sémantique avec embeddings et ChromaDB. \\
+\texttt{frontend/src/App.tsx} & Routes principales du frontend. \\
+\texttt{frontend/src/services/api.ts} & Communication entre frontend et backend. \\
+\texttt{frontend/src/pages/SearchPage.tsx} & Page d'accueil et recherche. \\
+\texttt{frontend/src/pages/BrowsePage.tsx} & Navigation et filtres des datasets. \\
+\texttt{frontend/src/pages/DatasetProfilePage.tsx} & Détail et profil d'un dataset. \\
+\texttt{docker-compose.yml} & Lancement des services backend, frontend, database et ChromaDB. \\
+\bottomrule
+\end{longtable}
+
+\end{document}
