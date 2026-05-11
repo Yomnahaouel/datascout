@@ -47,6 +47,7 @@ from db.models import (
     FileFormat,
     QualityScore,
     Tag,
+    TagCategory,
 )
 from pipeline.ingestion import IngestionPipeline
 
