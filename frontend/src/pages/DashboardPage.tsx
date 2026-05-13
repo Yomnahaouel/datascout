@@ -8,13 +8,108 @@ import BoxPlotChart from "../components/charts/BoxPlotChart";
 import HeatmapChart from "../components/charts/HeatmapChart";
 import MissingValuesMap from "../components/charts/MissingValuesMap";
 import LoadingSpinner from "../components/common/LoadingSpinner";
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+type NameValueDatum = { name: string; value: number; count?: number };
+type TimeSeriesDatum = { date?: string; name?: string; count?: number; value?: number };
+
+function normalizeNameValueData(data: unknown[]): NameValueDatum[] {
+  return data
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const name = String(row.name ?? row.label ?? row.date ?? row.column ?? "Unknown");
+      const rawValue = row.value ?? row.count ?? 0;
+      const value = typeof rawValue === "number" ? rawValue : Number(rawValue) || 0;
+      return { name, value };
+    })
+    .filter((item): item is NameValueDatum => item !== null);
+}
+
+function renderKpiCards(chart: ChartConfig) {
+  const rawData = chart.data ?? chart.config?.data;
+  const cards = Array.isArray(rawData)
+    ? rawData.map((item) => {
+        const row = (item ?? {}) as Record<string, unknown>;
+        return { label: String(row.label ?? row.name ?? "Metric"), value: row.value ?? "N/A" };
+      })
+    : Object.entries((rawData ?? {}) as Record<string, unknown>).map(([key, value]) => ({
+        label: key.replace(/_/g, " "),
+        value,
+      }));
+
+  return (
+    <div className="h-full">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">{chart.title}</h3>
+      <div className="grid grid-cols-2 gap-3">
+        {cards.map((card) => (
+          <div key={card.label} className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-blue-500">{card.label}</p>
+            <p className="mt-1 text-2xl font-bold text-blue-900">{String(card.value)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function renderBarChart(data: NameValueDatum[], title: string) {
+  return (
+    <div className="h-full">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 25 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <Tooltip />
+          <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={70} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function renderTimeSeries(data: TimeSeriesDatum[], title: string) {
+  const chartData = data.map((item) => ({
+    name: item.date ?? item.name ?? "Unknown",
+    value: item.count ?? item.value ?? 0,
+  }));
+
+  return (
+    <div className="h-full">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 25 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <Tooltip />
+          <Line type="monotone" dataKey="value" stroke="#2563EB" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 // Chart component renderer based on chart type
 function renderChart(chart: ChartConfig) {
-  // Cast data to any for flexibility - API returns varied structures
-  const chartData = (chart.data || chart.config?.data || []) as unknown[];
+  const rawChartData = chart.data ?? chart.config?.data ?? [];
+  const chartData = Array.isArray(rawChartData) ? rawChartData : [];
 
   switch (chart.chart_type) {
+    case "kpi_cards":
+      return renderKpiCards(chart);
     case "histogram":
       return (
         <HistogramChart
@@ -22,13 +117,25 @@ function renderChart(chart: ChartConfig) {
           title={chart.title}
         />
       );
+    case "bar":
+      return renderBarChart(normalizeNameValueData(chartData), chart.title);
     case "pie":
       return (
         <PieChartComponent
-          data={chartData as { name: string; value: number; color?: string }[]}
+          data={normalizeNameValueData(chartData) as { name: string; value: number; color?: string }[]}
           title={chart.title}
         />
       );
+    case "class_balance":
+      return (
+        <PieChartComponent
+          data={normalizeNameValueData(chartData) as { name: string; value: number; color?: string }[]}
+          title={chart.title}
+        />
+      );
+    case "time_series":
+    case "line":
+      return renderTimeSeries(chartData as TimeSeriesDatum[], chart.title);
     case "box":
     case "boxplot":
       return (

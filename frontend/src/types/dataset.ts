@@ -108,7 +108,7 @@ export interface DashboardConfig {
 }
 
 export interface ChartConfig {
-  chart_type: "histogram" | "pie" | "bar" | "box" | "boxplot" | "scatter" | "heatmap" | "line" | "missing";
+  chart_type: "kpi_cards" | "histogram" | "pie" | "bar" | "box" | "boxplot" | "scatter" | "heatmap" | "line" | "time_series" | "class_balance" | "missing";
   title: string;
   x_axis?: string | null;
   y_axis?: string | null;

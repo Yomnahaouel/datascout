@@ -9,8 +9,8 @@ DataScout is an AI-powered smart data catalogue for banking datasets. It helps u
 - PII detection: email, phone number, credit card number, SSN, person names when detectable.
 - Domain tagging: Finance, Risk, Marketing, HR, Operations, Compliance, Products.
 - Data quality scoring.
-- Dashboard generation.
-- Semantic/vector search support through ChromaDB.
+- Dashboard generation support, disabled by default for faster local uploads.
+- Semantic/vector search support through ChromaDB, disabled by default for faster local uploads.
 
 ## Tech Stack
 
@@ -70,7 +70,14 @@ POSTGRES_DB=datascout
 CHROMA_AUTH_TOKEN=datascout
 CUDA_VISIBLE_DEVICES=0
 DEBUG=false
+
+# Fast local demo defaults: avoid heavy model downloads during uploads.
+DATASCOUT_HEAVY_ML=false
+DATASCOUT_SEMANTIC_SEARCH=false
+DATASCOUT_GENERATE_DASHBOARD=false
 ```
+
+Keep these three `DATASCOUT_*` flags as `false` for a smooth local demo. Set them to `true` only when you explicitly want the heavier BART domain classifier, semantic/vector indexing, or generated dashboard configs.
 
 Important: if the PostgreSQL volume already exists from an older run, keep the same `POSTGRES_PASSWORD` that was used when the database was first created. If the backend cannot connect to the database, see the troubleshooting section below.
 
@@ -91,6 +98,24 @@ docker compose up
 ```
 
 Do **not** use `--build` every time unless dependencies or Docker files changed.
+
+### Fast development mode
+
+For faster work after code changes or `git pull`, use the dev override:
+
+```powershell
+.\scripts\dev-up.ps1
+```
+
+Equivalent manual command:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+This mounts backend/frontend source files into the containers, so normal `.py`, `.tsx`, `.ts`, `.css`, and documentation changes do not need a full rebuild.
+
+Full guide: `docs/FAST_DEV_WORKFLOW.md`.
 
 ### 4. Open the application
 
@@ -257,7 +282,13 @@ docker compose logs backend --tail=120
 
 ## When to Rebuild Docker
 
-Use:
+In fast dev mode, use:
+
+```powershell
+.\scripts\dev-rebuild-when-needed.ps1
+```
+
+For the normal production-like stack, use:
 
 ```bash
 docker compose up --build
@@ -272,11 +303,18 @@ only when one of these files changed:
 - `backend/Dockerfile.cpu`
 - `frontend/Dockerfile`
 - `docker-compose.yml`
+- `docker-compose.dev.yml`
 
 For normal restart, use:
 
 ```bash
 docker compose up
+```
+
+or, for fast dev mode:
+
+```powershell
+.\scripts\dev-up.ps1
 ```
 
 ## Troubleshooting

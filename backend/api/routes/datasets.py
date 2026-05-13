@@ -113,6 +113,141 @@ def serialize_dataset_summary(dataset: Dataset) -> dict[str, Any]:
     }
 
 
+def _percent_score(score: float | None) -> float | None:
+    """Return a frontend-friendly percentage score."""
+    if score is None:
+        return None
+    return round(float(score) * 100, 1) if score <= 1 else round(float(score), 1)
+
+
+def _dashboard_response(dashboard: DashboardConfig) -> dict[str, Any]:
+    """Serialize a persisted dashboard configuration."""
+    generated_at = dashboard.generated_at.isoformat() if dashboard.generated_at else None
+    return {
+        "id": dashboard.id,
+        "dataset_id": dashboard.dataset_id,
+        "charts": dashboard.charts or [],
+        "kpis": dashboard.kpis or [],
+        "filters": dashboard.filters or [],
+        "layout": dashboard.layout or {"columns": 2, "chart_height": 350},
+        # The model has generated_at, not created_at. Keep created_at as an
+        # alias for older frontend code without touching the database schema.
+        "created_at": generated_at,
+        "generated_at": generated_at,
+        "summary": {},
+        "source": "generated",
+    }
+
+
+def _fallback_dashboard(dataset: Dataset) -> dict[str, Any]:
+    """Build a dashboard from stored profiling/quality metadata.
+
+    This keeps the dashboard page useful even when the heavier dashboard engine
+    was skipped during upload (DATASCOUT_GENERATE_DASHBOARD=false), and it also
+    works for datasets uploaded before dashboard generation was fixed.
+    """
+    profiles = sorted(dataset.column_profiles or [], key=lambda p: p.column_index)
+    quality = dataset.quality_scores[0] if dataset.quality_scores else None
+    quality_score = _percent_score(quality.overall_score if quality else dataset.quality_score)
+
+    pii_columns = [p for p in profiles if p.is_pii]
+    missing_info = [
+        {
+            "column": p.column_name,
+            "missing_pct": round(float(p.missing_pct or 0), 2),
+            "missing_count": int(p.missing_count or 0),
+        }
+        for p in profiles
+        if (p.missing_count or 0) > 0
+    ]
+
+    type_counts: dict[str, int] = {}
+    for p in profiles:
+        label = p.inferred_type or p.raw_dtype or "unknown"
+        type_counts[label] = type_counts.get(label, 0) + 1
+
+    charts: list[dict[str, Any]] = [
+        {
+            "chart_type": "kpi_cards",
+            "title": "Dataset overview",
+            "config": {
+                "data": {
+                    "rows": dataset.row_count or 0,
+                    "columns": dataset.column_count or len(profiles),
+                    "quality": quality_score,
+                    "pii_columns": len(pii_columns),
+                    "missing_columns": len(missing_info),
+                }
+            },
+            "data": [
+                {"label": "Rows", "value": dataset.row_count or 0},
+                {"label": "Columns", "value": dataset.column_count or len(profiles)},
+                {"label": "Quality", "value": f"{quality_score}%" if quality_score is not None else "N/A"},
+                {"label": "PII columns", "value": len(pii_columns)},
+            ],
+        }
+    ]
+
+    if type_counts:
+        charts.append(
+            {
+                "chart_type": "bar",
+                "title": "Columns by detected type",
+                "data": [{"name": k, "value": v} for k, v in sorted(type_counts.items())],
+            }
+        )
+
+    if profiles:
+        charts.append(
+            {
+                "chart_type": "pie",
+                "title": "PII coverage",
+                "data": [
+                    {"name": "PII columns", "value": len(pii_columns)},
+                    {"name": "Non-PII columns", "value": max(len(profiles) - len(pii_columns), 0)},
+                ],
+            }
+        )
+
+    if missing_info:
+        charts.append({"chart_type": "missing", "title": "Missing values by column", "data": missing_info})
+
+    for p in profiles:
+        if isinstance(p.distribution, list) and p.distribution:
+            charts.append(
+                {
+                    "chart_type": "histogram",
+                    "title": f"Distribution of {p.column_name}",
+                    "x_axis": p.column_name,
+                    "data": p.distribution,
+                }
+            )
+            if len([c for c in charts if c["chart_type"] == "histogram"]) >= 3:
+                break
+
+    summary = {
+        "total_rows": dataset.row_count or 0,
+        "total_columns": dataset.column_count or len(profiles),
+        "quality_score": quality_score if quality_score is not None else "N/A",
+        "pii_columns": len(pii_columns),
+        "columns_with_missing_values": len(missing_info),
+        "dataset_status": dataset.status.value,
+    }
+
+    return {
+        "id": None,
+        "dataset_id": dataset.id,
+        "charts": charts,
+        "kpis": charts[0]["data"],
+        "filters": [],
+        "layout": {"columns": 2, "rows": (len(charts) + 1) // 2, "chart_height": 350},
+        "created_at": None,
+        "generated_at": None,
+        "summary": summary,
+        "source": "fallback",
+    }
+
+
 def get_file_format(filename: str) -> FileFormat | None:
     """Determine file format from extension."""
     ext = Path(filename).suffix.lower()
@@ -592,15 +727,23 @@ async def get_dataset_quality(
 async def get_dataset_dashboard(
     dataset_id: int,
     db: Annotated[AsyncSession, Depends(get_async_db)],
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     """
     Get auto-generated dashboard configuration for a dataset.
 
     Returns recommended charts, KPIs, and layout settings.
     """
-    # Verify dataset exists
-    ds_result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
-    if not ds_result.scalar_one_or_none():
+    ds_result = await db.execute(
+        select(Dataset)
+        .options(
+            selectinload(Dataset.column_profiles),
+            selectinload(Dataset.quality_scores),
+            selectinload(Dataset.tags),
+        )
+        .where(Dataset.id == dataset_id)
+    )
+    dataset = ds_result.scalar_one_or_none()
+    if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     result = await db.execute(
@@ -608,19 +751,10 @@ async def get_dataset_dashboard(
     )
     dashboard = result.scalar_one_or_none()
 
-    if not dashboard:
-        return None
+    if dashboard:
+        return _dashboard_response(dashboard)
 
-    return {
-        "id": dashboard.id,
-        "dataset_id": dashboard.dataset_id,
-        "charts": dashboard.charts,
-        "kpis": dashboard.kpis,
-        "filters": dashboard.filters,
-        "layout": dashboard.layout,
-        "created_at": dashboard.created_at.isoformat() if dashboard.created_at else None,
-        "generated_at": dashboard.generated_at.isoformat() if dashboard.generated_at else None,
-    }
+    return _fallback_dashboard(dataset)
 
 
 # -----------------------------------------------------------------------------

@@ -1,35 +1,53 @@
-# Dataset Management
-POST   /api/datasets/upload          # Upload new dataset
-GET    /api/datasets                 # List all datasets (with filters)
-GET    /api/datasets/{id}            # Get dataset details
-DELETE /api/datasets/{id}            # Remove dataset
-GET    /api/datasets/{id}/preview    # Preview first N rows
-GET    /api/datasets/{id}/download   # Download original file
+# DataScout API Routes
+# Base URL: /api/v1
 
-# Semantic Search
-GET    /api/search?q={query}         # Natural language search
-GET    /api/search/suggest?q={query} # Auto-complete suggestions
-
-# Auto-Profile
-GET    /api/datasets/{id}/profile           # Get full profile
-GET    /api/datasets/{id}/profile/columns   # Get column-level details
-POST   /api/datasets/{id}/profile/rerun     # Re-run profiling
-
-# Auto-Tags
-GET    /api/datasets/{id}/tags       # Get all tags
-POST   /api/datasets/{id}/tags       # Add manual tag
-PUT    /api/datasets/{id}/tags/{tid} # Edit tag
-DELETE /api/datasets/{id}/tags/{tid} # Remove tag
-
-# Quality Score
-GET    /api/datasets/{id}/quality    # Get quality breakdown
-
-# Auto-Dashboard
-GET    /api/datasets/{id}/dashboard  # Get dashboard config + data
+# Health
+GET    /health                         # Backend health check
+GET    /docs                           # FastAPI Swagger documentation
 
 # Platform Stats
-GET    /api/stats/overview           # Total datasets, avg quality, etc.
+GET    /api/v1/stats                   # Total datasets, total rows, average quality, domain count
 
-# Model Comparison (for academic evaluation)
-GET    /api/ai/benchmarks            # All model comparison results
-GET    /api/ai/benchmarks/{engine}   # Per-engine comparison
+# Dataset Management
+POST   /api/v1/datasets/upload         # Upload a new CSV/TSV/JSON/Parquet/Excel dataset
+GET    /api/v1/datasets                # List datasets with pagination, filters, sorting, tags/domains
+GET    /api/v1/datasets/{id}           # Get dataset details, profiles, tags, quality, dashboard config
+DELETE /api/v1/datasets/{id}           # Delete dataset and related analysis records
+GET    /api/v1/datasets/{id}/preview   # Preview raw rows from uploaded file
+POST   /api/v1/datasets/{id}/reprocess # Clear analysis records and rerun ingestion pipeline
+
+# Dataset Search
+GET    /api/v1/datasets/search?q={query}&limit={n}
+                                        # Semantic search across indexed datasets
+
+# Auto-Profile
+GET    /api/v1/datasets/{id}/profile   # Column-level statistical profile
+
+# Auto-Tags
+GET    /api/v1/datasets/{id}/tags      # Domain, data-type, PII and other tags
+
+# Quality Score
+GET    /api/v1/datasets/{id}/quality   # Quality breakdown and recommendations
+
+# Auto-Dashboard
+GET    /api/v1/datasets/{id}/dashboard # Generated dashboard charts/KPIs when enabled
+
+# Data Sources
+GET    /api/v1/data-sources/           # List external/data-source records
+POST   /api/v1/data-sources/           # Create a data-source record
+GET    /api/v1/data-sources/{id}       # Get a data-source record
+
+# Jobs
+GET    /api/v1/jobs/                   # List ingestion/processing jobs
+POST   /api/v1/jobs/                   # Create a processing job for a data source
+GET    /api/v1/jobs/{id}               # Get a processing job
+
+# Results
+GET    /api/v1/results/                # List processing results, optionally ?job_id={id}
+POST   /api/v1/results/                # Create a processing result
+GET    /api/v1/results/{id}            # Get a processing result
+
+# Academic / Evaluation Scripts
+# These are command-line scripts, not HTTP routes:
+# - backend/evaluation/evaluate_domain_classifier.py
+# - backend/scripts/generate_synthetic_data.py
