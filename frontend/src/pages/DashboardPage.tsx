@@ -23,6 +23,93 @@ import {
 type NameValueDatum = { name: string; value: number; count?: number };
 type TimeSeriesDatum = { date?: string; name?: string; count?: number; value?: number };
 
+function toPercent(score: number | null | undefined): number | null {
+  if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
+  return score <= 1 ? Math.round(score * 1000) / 10 : Math.round(score * 10) / 10;
+}
+
+function buildFallbackDashboard(dataset: DatasetDetail): DashboardConfig {
+  const profiles = [...(dataset.column_profiles ?? [])].sort((a, b) => a.column_index - b.column_index);
+  const piiColumns = profiles.filter((profile) => profile.is_pii || profile.pii_detected);
+  const missingColumns = profiles
+    .filter((profile) => (profile.missing_count ?? 0) > 0)
+    .map((profile) => ({
+      column: profile.column_name,
+      missing_pct: Number(profile.missing_pct ?? 0),
+      missing_count: Number(profile.missing_count ?? 0),
+    }));
+
+  const qualityScore = toPercent(dataset.quality_score_detail?.overall_score ?? dataset.quality_score);
+  const typeCounts = profiles.reduce<Record<string, number>>((acc, profile) => {
+    const label = profile.inferred_type || profile.raw_dtype || "unknown";
+    acc[label] = (acc[label] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const charts: ChartConfig[] = [
+    {
+      chart_type: "kpi_cards",
+      title: "Dataset overview",
+      data: [
+        { label: "Rows", value: dataset.row_count ?? 0 },
+        { label: "Columns", value: dataset.column_count ?? profiles.length },
+        { label: "Quality", value: qualityScore !== null ? `${qualityScore}%` : "N/A" },
+        { label: "PII columns", value: piiColumns.length },
+      ],
+    },
+  ];
+
+  if (Object.keys(typeCounts).length > 0) {
+    charts.push({
+      chart_type: "bar",
+      title: "Columns by detected type",
+      data: Object.entries(typeCounts).map(([name, value]) => ({ name, value })),
+    });
+  }
+
+  if (profiles.length > 0) {
+    charts.push({
+      chart_type: "pie",
+      title: "PII coverage",
+      data: [
+        { name: "PII columns", value: piiColumns.length },
+        { name: "Non-PII columns", value: Math.max(profiles.length - piiColumns.length, 0) },
+      ],
+    });
+  }
+
+  if (missingColumns.length > 0) {
+    charts.push({ chart_type: "missing", title: "Missing values by column", data: missingColumns });
+  }
+
+  profiles
+    .filter((profile) => Array.isArray(profile.distribution) && profile.distribution.length > 0)
+    .slice(0, 3)
+    .forEach((profile) => {
+      charts.push({
+        chart_type: "histogram",
+        title: `Distribution of ${profile.column_name}`,
+        x_axis: profile.column_name,
+        data: profile.distribution ?? [],
+      });
+    });
+
+  return {
+    dataset_id: dataset.id,
+    charts,
+    kpis: charts[0]?.data as DashboardConfig["kpis"],
+    filters: [],
+    layout: { columns: 2, rows: Math.ceil(charts.length / 2), chart_height: 350 },
+    summary: {
+      total_rows: dataset.row_count ?? 0,
+      total_columns: dataset.column_count ?? profiles.length,
+      quality_score: qualityScore ?? "N/A",
+      pii_columns: piiColumns.length,
+      columns_with_missing_values: missingColumns.length,
+    },
+  };
+}
+
 function normalizeNameValueData(data: unknown[]): NameValueDatum[] {
   return data
     .map((item) => {
@@ -183,10 +270,22 @@ export default function DashboardPage() {
     if (!id) return;
     const numId = Number(id);
     queueMicrotask(() => setLoading(true));
-    Promise.all([getDataset(numId), getDatasetDashboard(numId)])
-      .then(([datasetData, dashboardData]) => {
+    getDataset(numId)
+      .then(async (datasetData) => {
+        let dashboardData: DashboardConfig | null = datasetData.dashboard_config;
+
+        try {
+          dashboardData = await getDatasetDashboard(numId);
+        } catch (err) {
+          console.warn("Dashboard endpoint unavailable, using local fallback:", err);
+        }
+
         setDataset(datasetData);
-        setDashboard(dashboardData);
+        setDashboard(
+          dashboardData && Array.isArray(dashboardData.charts) && dashboardData.charts.length > 0
+            ? dashboardData
+            : buildFallbackDashboard(datasetData)
+        );
       })
       .catch((err) => {
         console.error("Failed to load dashboard:", err);
@@ -202,12 +301,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (!dataset || !dashboard) {
+  if (!dataset) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Dashboard not available</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Dataset not available</h2>
         <p className="text-gray-500 mb-4">
-          Unable to generate dashboard for this dataset.
+          Unable to load this dataset.
         </p>
         <Link to={`/datasets/${id}`} className="text-blue-600 hover:underline">
           ← Back to dataset
@@ -215,6 +314,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const activeDashboard = dashboard ?? buildFallbackDashboard(dataset);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -282,17 +383,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Dashboard info */}
-        {dashboard.generated_at && (
+        {activeDashboard.generated_at && (
           <div className="mb-6 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg">
             <p className="text-sm text-blue-700">
               <span className="font-medium">Dashboard generated:</span>{" "}
-              {new Date(dashboard.generated_at).toLocaleString()}
+              {new Date(activeDashboard.generated_at).toLocaleString()}
             </p>
           </div>
         )}
 
         {/* Charts Grid */}
-        {dashboard.charts.length === 0 ? (
+        {activeDashboard.charts.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
             <svg
               className="w-16 h-16 text-gray-300 mx-auto mb-4"
@@ -316,7 +417,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {dashboard.charts.map((chart, index) => (
+            {activeDashboard.charts.map((chart, index) => (
               <div
                 key={index}
                 className="bg-white rounded-xl border border-gray-200 p-6 min-h-[350px]"
@@ -328,7 +429,7 @@ export default function DashboardPage() {
         )}
 
         {/* Summary Statistics */}
-        {dashboard.summary && (
+        {activeDashboard.summary && (
           <div className="mt-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Summary Statistics
@@ -346,7 +447,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {Object.entries(dashboard.summary).map(([key, value]) => (
+                  {Object.entries(activeDashboard.summary).map(([key, value]) => (
                     <tr key={key} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-600 capitalize">
                         {key.replace(/_/g, " ")}

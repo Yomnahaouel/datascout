@@ -11,7 +11,11 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: ['.trycloudflare.com'],
     proxy: {
-      '/api': apiProxyTarget,
+      '/api': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

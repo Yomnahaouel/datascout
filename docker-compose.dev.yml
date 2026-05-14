@@ -11,6 +11,9 @@ services:
     environment:
       DEBUG: "true"
       PYTHONUNBUFFERED: "1"
+      # In dev, generate dashboard configs during upload.
+      # The frontend also has a fallback for older datasets with no saved dashboard.
+      DATASCOUT_GENERATE_DASHBOARD: "true"
     volumes:
       - ./backend:/app
       - ./data:/app/data
