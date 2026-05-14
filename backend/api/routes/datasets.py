@@ -24,7 +24,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -370,6 +370,94 @@ async def run_pipeline_background(dataset_id: int) -> None:
 # -----------------------------------------------------------------------------
 
 
+def _contains(text: Any, query: str) -> bool:
+    """Case-insensitive containment helper for optional values."""
+    return query in str(text or "").lower()
+
+
+def _lexical_score_dataset(dataset: Dataset, query: str) -> tuple[float, list[str], str | None]:
+    """Score a dataset using local metadata when semantic search is disabled/unindexed."""
+    q = query.lower().strip()
+    if not q:
+        return 0.0, [], None
+
+    score = 0.0
+    matched_columns: list[str] = []
+    snippets: list[str] = []
+
+    if _contains(dataset.name, q):
+        score += 0.45
+        snippets.append(f"name: {dataset.name}")
+
+    if _contains(dataset.description, q):
+        score += 0.25
+        snippets.append(str(dataset.description))
+
+    for tag in dataset.tags or []:
+        tag_value = getattr(tag, "tag_value", "")
+        tag_category = getattr(getattr(tag, "tag_category", None), "value", getattr(tag, "tag_category", ""))
+        if _contains(tag_value, q) or _contains(tag_category, q):
+            score += 0.25
+            snippets.append(f"tag: {tag_value}")
+
+    for profile in dataset.column_profiles or []:
+        column_match = _contains(profile.column_name, q)
+        type_match = _contains(profile.inferred_type, q) or _contains(profile.raw_dtype, q)
+        pii_match = bool(profile.is_pii and (q in {"pii", "sensitive", "personal"} or _contains(profile.pii_type, q)))
+
+        if column_match or type_match or pii_match:
+            if profile.column_name not in matched_columns:
+                matched_columns.append(profile.column_name)
+            score += 0.2 if column_match else 0.12
+            if pii_match:
+                score += 0.15
+
+    if matched_columns:
+        snippets.append(f"matched columns: {', '.join(matched_columns[:5])}")
+
+    return min(score, 1.0), matched_columns, " · ".join(snippets[:3]) or None
+
+
+async def _lexical_search_datasets(
+    db: AsyncSession,
+    q: str,
+    limit: int,
+) -> list[DatasetSearchResult]:
+    """Reliable metadata search across names, descriptions, tags, columns, and PII."""
+    result = await db.execute(
+        select(Dataset)
+        .options(
+            selectinload(Dataset.tags),
+            selectinload(Dataset.column_profiles),
+        )
+        .order_by(Dataset.uploaded_at.desc())
+        .limit(300)
+    )
+    datasets = result.scalars().all()
+
+    ranked: list[tuple[float, DatasetSearchResult]] = []
+    for dataset in datasets:
+        score, matched_columns, snippet = _lexical_score_dataset(dataset, q)
+        if score <= 0:
+            continue
+        ranked.append(
+            (
+                score,
+                DatasetSearchResult(
+                    dataset_id=dataset.id,
+                    name=dataset.name,
+                    description=dataset.description,
+                    relevance_score=score,
+                    matched_columns=matched_columns,
+                    snippet=snippet,
+                ),
+            )
+        )
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [item[1] for item in ranked[:limit]]
+
+
 @router.get("/search", response_model=list[DatasetSearchResult])
 async def search_datasets(
     db: Annotated[AsyncSession, Depends(get_async_db)],
@@ -377,55 +465,60 @@ async def search_datasets(
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
 ) -> list[DatasetSearchResult]:
     """
-    Semantic search across all datasets (spec: sentence-transformers + ChromaDB).
+    Search across all datasets.
+
+    Uses semantic/vector search when it is enabled and indexed, then falls back
+    to fast metadata search so local demos still find datasets by name, domain,
+    tag, column name, inferred type, or PII type.
     """
-    from engines import SearchEngine
+    enriched: list[DatasetSearchResult] = []
 
-    try:
-        chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
-        chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
-        chromadb_token = os.getenv("CHROMADB_TOKEN")
+    if os.getenv("DATASCOUT_SEMANTIC_SEARCH", "false").lower() in {"1", "true", "yes"}:
+        try:
+            from engines import SearchEngine
 
-        search_engine = SearchEngine(
-            collection_name="dataset_embeddings",
-            chromadb_host=chromadb_host,
-            chromadb_port=chromadb_port,
-            chromadb_token=chromadb_token,
-        )
+            chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
+            chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
+            chromadb_token = os.getenv("CHROMADB_TOKEN")
 
-        search_resp = await search_engine.search(q, top_k=limit)
+            search_engine = SearchEngine(
+                collection_name="dataset_embeddings",
+                chromadb_host=chromadb_host,
+                chromadb_port=chromadb_port,
+                chromadb_token=chromadb_token,
+            )
 
-        enriched = []
-        for result in search_resp.results:
-            dataset_id = result.metadata.get("dataset_id")
-            if dataset_id is None and result.id.isdigit():
-                dataset_id = int(result.id)
-            if dataset_id is None:
-                continue
-            try:
-                ds_result = await db.execute(
-                    select(Dataset).where(Dataset.id == int(dataset_id))
-                )
-                dataset = ds_result.scalar_one_or_none()
-                if dataset:
-                    enriched.append(
-                        DatasetSearchResult(
-                            dataset_id=dataset.id,
-                            name=dataset.name,
-                            description=dataset.description,
-                            relevance_score=result.score,
-                            matched_columns=[],
-                            snippet=result.content[:500] if result.content else None,
+            search_resp = await search_engine.search(q, top_k=limit)
+
+            for result in search_resp.results:
+                dataset_id = result.metadata.get("dataset_id")
+                if dataset_id is None and result.id.isdigit():
+                    dataset_id = int(result.id)
+                if dataset_id is None:
+                    continue
+                try:
+                    ds_result = await db.execute(select(Dataset).where(Dataset.id == int(dataset_id)))
+                    dataset = ds_result.scalar_one_or_none()
+                    if dataset:
+                        enriched.append(
+                            DatasetSearchResult(
+                                dataset_id=dataset.id,
+                                name=dataset.name,
+                                description=dataset.description,
+                                relevance_score=result.score,
+                                matched_columns=[],
+                                snippet=result.content[:500] if result.content else None,
+                            )
                         )
-                    )
-            except (ValueError, TypeError):
-                continue
+                except (ValueError, TypeError):
+                    continue
+        except Exception as e:
+            logger.warning(f"Semantic search unavailable; using metadata search: {e}")
 
-        return enriched
+    if enriched:
+        return enriched[:limit]
 
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        raise HTTPException(status_code=500, detail="Search service unavailable")
+    return await _lexical_search_datasets(db, q, limit)
 
 
 
@@ -458,7 +551,22 @@ async def list_datasets(
     if format_filter:
         query = query.where(Dataset.file_format == format_filter)
     if search_name:
-        query = query.where(Dataset.name.ilike(f"%{search_name}%"))
+        pattern = f"%{search_name}%"
+        query = (
+            query.outerjoin(Dataset.tags)
+            .outerjoin(Dataset.column_profiles)
+            .where(
+                or_(
+                    Dataset.name.ilike(pattern),
+                    Dataset.description.ilike(pattern),
+                    Tag.tag_value.ilike(pattern),
+                    ColumnProfile.column_name.ilike(pattern),
+                    ColumnProfile.inferred_type.ilike(pattern),
+                    ColumnProfile.pii_type.ilike(pattern),
+                )
+            )
+            .distinct()
+        )
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
