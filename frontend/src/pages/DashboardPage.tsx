@@ -23,6 +23,61 @@ import {
 type NameValueDatum = { name: string; value: number; count?: number };
 type TimeSeriesDatum = { date?: string; name?: string; count?: number; value?: number };
 
+type NormalizedChartType =
+  | "kpi_cards"
+  | "histogram"
+  | "bar"
+  | "pie"
+  | "class_balance"
+  | "time_series"
+  | "line"
+  | "box"
+  | "boxplot"
+  | "heatmap"
+  | "missing"
+  | "scatter";
+
+function normalizeChartType(chartType: string): NormalizedChartType | string {
+  const cleaned = chartType
+    .trim()
+    .replace(/^['"`]+|['"`]+$/g, "")
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  const aliases: Record<string, NormalizedChartType> = {
+    kpi: "kpi_cards",
+    kpis: "kpi_cards",
+    kpi_card: "kpi_cards",
+    kpi_cards: "kpi_cards",
+    bar: "bar",
+    bar_chart: "bar",
+    column_chart: "bar",
+    histogram: "histogram",
+    hist: "histogram",
+    pie: "pie",
+    pie_chart: "pie",
+    donut: "pie",
+    doughnut: "pie",
+    class_balance: "class_balance",
+    time_series: "time_series",
+    timeseries: "time_series",
+    line: "line",
+    line_chart: "line",
+    box: "box",
+    boxplot: "boxplot",
+    box_plot: "boxplot",
+    heatmap: "heatmap",
+    heat_map: "heatmap",
+    missing: "missing",
+    missing_values: "missing",
+    missing_values_map: "missing",
+    scatter: "scatter",
+    scatter_plot: "scatter",
+  };
+
+  return aliases[cleaned] ?? cleaned;
+}
+
 function normalizeNameValueData(data: unknown[]): NameValueDatum[] {
   return data
     .map((item) => {
@@ -51,13 +106,25 @@ function renderKpiCards(chart: ChartConfig) {
   return (
     <div className="h-full">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">{chart.title}</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-blue-500">{card.label}</p>
-            <p className="mt-1 text-2xl font-bold text-blue-900">{String(card.value)}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {cards.map((card, index) => {
+          const accents = [
+            "from-blue-50 to-cyan-50 border-blue-100 text-blue-700 text-blue-950",
+            "from-emerald-50 to-teal-50 border-emerald-100 text-emerald-700 text-emerald-950",
+            "from-violet-50 to-fuchsia-50 border-violet-100 text-violet-700 text-violet-950",
+            "from-amber-50 to-orange-50 border-amber-100 text-amber-700 text-amber-950",
+          ];
+          const [gradientFrom, gradientTo, borderColor, labelColor, valueColor] = accents[index % accents.length].split(" ");
+          return (
+            <div
+              key={card.label}
+              className={`rounded-xl border ${borderColor} bg-gradient-to-br ${gradientFrom} ${gradientTo} px-4 py-4 shadow-sm`}
+            >
+              <p className={`text-xs font-semibold uppercase tracking-wide ${labelColor}`}>{card.label}</p>
+              <p className={`mt-2 text-3xl font-bold ${valueColor}`}>{String(card.value)}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -106,8 +173,9 @@ function renderTimeSeries(data: TimeSeriesDatum[], title: string) {
 function renderChart(chart: ChartConfig) {
   const rawChartData = chart.data ?? chart.config?.data ?? [];
   const chartData = Array.isArray(rawChartData) ? rawChartData : [];
+  const chartType = normalizeChartType(String(chart.chart_type));
 
-  switch (chart.chart_type) {
+  switch (chartType) {
     case "kpi_cards":
       return renderKpiCards(chart);
     case "histogram":
@@ -166,8 +234,14 @@ function renderChart(chart: ChartConfig) {
       );
     default:
       return (
-        <div className="flex items-center justify-center h-full text-gray-500">
-          Unsupported chart type: {chart.chart_type}
+        <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 px-6">
+          <div className="mb-3 rounded-full bg-gray-100 p-3 text-gray-400">
+            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-6m4 6V7m4 10v-4M5 17v-2" />
+            </svg>
+          </div>
+          <p className="font-medium text-gray-700">Chart type not supported yet</p>
+          <p className="mt-1 text-xs text-gray-400">{String(chart.chart_type)}</p>
         </div>
       );
   }
